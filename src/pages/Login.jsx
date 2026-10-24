@@ -35,10 +35,10 @@ export default function Login() {
       const res = await fetch(`${LOCAL_API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringfy({ identifier, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
-      const data = res.json();
+      const data = await res.json();
 
       if (!res.ok) {
         setError(data.message || "Login Failed failed");
@@ -53,7 +53,9 @@ export default function Login() {
       saveSession(challenge, data.user, true);
     } catch (error) {
       console.error(error);
-      setError("Network error while Login . Please try again.");
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,7 +83,7 @@ export default function Login() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ challenge, token: code }),
     });
-    const data = res.json();
+    const data = await res.json();
 
     saveSession(data.accessToken, data.user, remember);
 
