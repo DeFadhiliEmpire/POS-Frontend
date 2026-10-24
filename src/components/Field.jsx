@@ -9,7 +9,7 @@ export default function Field({ icon: Icon, className = "", ...props }) {
     <div className="relative">
       {Icon && <Icon size={18} strokeWidth={1.8} className={iconCls} />}
       <input
-        className={`input ${Icon ? "pl-11" : ""} ${className}`}
+        className={`w-full h-12 rounded-lg border border-line bg-slate-50 px-3.5 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-green-600 focus:ring-2 focus:ring-green-600 focus:ring-opacity-40 ${Icon ? "pl-11" : ""} ${className}`}
         {...props}
       />
     </div>
@@ -23,7 +23,7 @@ export function PasswordField({ icon: Icon = Lock, ...props }) {
       <Icon size={18} strokeWidth={1.8} className={iconCls} />
       <input
         type={show ? "text" : "password"}
-        className="input pl-11 pr-11"
+        className="w-full h-12 rounded-lg border border-line bg-slate-50 px-3.5 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-green-600 focus:ring-2 focus:ring-green-600 focus:ring-opacity-20 pl-11 pr-11"
         {...props}
       />
       <button

@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .lbl {
+    @apply block text-[13px] font-semibold mb-1.5;
+  }
+  .input {
+    @apply w-full h-12 rounded-[10px] border  bg-slate-50 px-3.5 text-[15px] 
+           placeholder:text-slate-400 transition
+           focus:outline-none focus:bg-white  focus:ring-[3px] focus:ring-[#16915f] focus:ring-[#0f7a50];
+  }
+  .btn {
+    @applyh-12 w-full rounded-lg 
+    bg-brand text-white text-base font-semibold
+    flex items-center justify-center gap-2.5
+    transition hover:bg-brand-dark active:translate-y-px
+    disabled:opacity-70 disabled:cursor-progress
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2;
+  }
+  .lnk {
+    @apply text-[#1a56c4] font-medium hover:underline;
+  }
+}
+
+body {
+  @apply font-sans text-[#1b2a3a];
+}
