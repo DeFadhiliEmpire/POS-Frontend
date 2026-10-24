@@ -118,15 +118,16 @@ export default function Login() {
         <aside
           className="relative overflow-hidden text-white px-6 py-7 md:p-11 flex flex-col justify-center gap-3.5 md:gap-8"
           style={{
-            background: `url${SuperLogo}`,
+            background: `linear-gradient(rgba(10,18,28,0.7), rgba(10,18,28,0.8)), url(${SuperLogo})`,
             backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
           }}
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,.18),transparent_45%)]" />
-          <div className="relative flex items-center gap-3 text-[26px] md:text-[32px] font-bold tracking-tight">
+          <div className="relative flex items-center gap-3 text-[24px] md:text-[32px] font-semibold tracking-tight">
             <ShoppingCart
               size={38}
-              strokeWidth={2}
+              strokeWidth={1.5}
               className="text-[#2fd18f]"
             />
             FreshMart
