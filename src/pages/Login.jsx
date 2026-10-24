@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
 import Field, { PasswordField } from "../components/Field";
@@ -24,7 +24,39 @@ export default function Login() {
 
   const inputsRef = useRef([]);
 
-  const handleLogin = async () => {};
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!identifier.trim() || !password) {
+      return setError("Enter your email or username and your password.");
+    }
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${LOCAL_API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringfy({ identifier, password }),
+      });
+
+      const data = res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Login Failed failed");
+      }
+
+      if (data.challenge) {
+        setChallenge(data.challenge);
+        setIdentifier("");
+        setPassword("");
+        setStatus("success");
+      }
+      saveSession(challenge, data.user, true);
+    } catch (error) {
+      console.error(error);
+      setError("Network error while Login . Please try again.");
+    }
+  };
 
   const handleChange = (val, i) => {
     const newCode = [...code];
@@ -65,6 +97,13 @@ export default function Login() {
 
     navigate("/dashboard");
   };
+
+  useEffect(() => {
+    if (status === "success") {
+      const statusTimer = setTimeout(() => setStatus("pending"), 60000);
+      return () => clearTimeout(statusTimer);
+    }
+  });
 
   return (
     <div
@@ -137,6 +176,23 @@ export default function Login() {
                 Sign In
               </Button>
             </form>
+
+            {/* 6-digit input boxes */}
+            {status === "success" && (
+              <div className="flex gap-2 mt-4">
+                {code.map((val, i) => (
+                  <input
+                    key={i}
+                    type="text"
+                    maxLength={1}
+                    value={val}
+                    onChange={(e) => handleChange(e.target.value, i)}
+                    ref={(el) => (inputsRef.current[i] = el)}
+                    className="w-10 h-10 text-center border rounded focus:outline-none focus:ring-2 focus:ring-green-700"
+                  />
+                ))}
+              </div>
+            )}
             <p className="text-center text-[12.5px] text-slate-500 mt-6">
               Don’t have an account? Contact your administrator
             </p>
