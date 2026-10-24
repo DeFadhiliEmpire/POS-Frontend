@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Login from "./pages/Login.jsx";
 import TestProducts from "./TestProducts";
 import TestOfflineSale from "./TestOfflineSale";
 import TestOnlineSaleSync from "./TestOnlineSaleSync";
@@ -16,6 +17,7 @@ function App() {
       <AutoSaleSync getToken={getToken} />
       <Routes>
         <Route path="/" element={<h1>Home Page</h1>} />
+        <Route path="/login" element={<Login />} />
         <Route path="/testProduct" element={<TestProducts />} />
         <Route path="/testofflinesale" element={<TestOfflineSale />} />
         <Route path="/testonlinesalesync" element={<TestOnlineSaleSync />} />
