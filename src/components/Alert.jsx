@@ -3,7 +3,7 @@ export default function Alert({ type = "error", children }) {
 
   const styles =
     type === "success"
-      ? "bg-emerald-50 text-emerald-800"
+      ? "bg-green-50 text-green-800"
       : "bg-red-50 text-red-700";
 
   return (

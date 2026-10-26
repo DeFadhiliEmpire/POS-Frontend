@@ -6,7 +6,6 @@ import Checkbox from "../components/Checkbox";
 import Button from "../components/Button";
 import Alert from "../components/Alert.jsx";
 import SuperLogo from "../Assets/superMarket.jpg";
-import { saveSession } from "../auth";
 
 const LOCAL_API = "http://localhost:5000";
 
@@ -16,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState("");
@@ -48,10 +48,13 @@ export default function Login() {
         data = {};
       }
 
-      console.log("Login response:", res.status, data);
-
       if (!res.ok) {
-        return setError(data.message || data.error || "Login failed");
+        return showError(data.message || data.error || "Login failed");
+      }
+
+      //res message even if it is not an error to alert
+      if (res.ok) {
+        showSuccess(data.message);
       }
 
       if (data.challange) {
@@ -64,7 +67,7 @@ export default function Login() {
 
       // Save session with correct token
       if (data.accessToken) {
-        saveSession(data.accessToken, data.user, remember);
+        setAccessToken(data.accessToken);
         navigate("/dashboard");
         return;
       }
@@ -74,6 +77,16 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const showError = (msg) => {
+    setError(msg);
+    setTimeout(() => setError(""), 30000);
+  };
+
+  const showSuccess = (msg) => {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(""), 30000);
   };
 
   const handleChange = (val, i) => {
@@ -118,7 +131,7 @@ export default function Login() {
 
   useEffect(() => {
     if (status === "success") {
-      const statusTimer = setTimeout(() => setStatus("pending"), 60000);
+      const statusTimer = setTimeout(() => setStatus("pending"), 50000);
       return () => clearTimeout(statusTimer);
     }
   });
@@ -129,7 +142,7 @@ export default function Login() {
                     bg-[radial-gradient(circle_at_15%_10%,#dff1e8,transparent_45%),radial-gradient(circle_at_90%_95%,#e3ebf5,transparent_45%)]"
     >
       <div
-        className="w-full max-w-[980px] grid md:grid-cols-[42%_1fr] md:min-h-[560px] bg-white rounded-2xl md:rounded-[20px] overflow-hidden
+        className="w-full max-w-[850px] grid md:grid-cols-[42%_1fr] md:min-h-[560px] bg-white rounded-2xl md:rounded-[20px] overflow-hidden
                       shadow-[0_24px_60px_-20px_rgba(20,40,60,.35),0_2px_8px_rgba(20,40,60,.08)]"
       >
         {/* Brand panel */}
@@ -159,13 +172,14 @@ export default function Login() {
         </aside>
 
         {/* Form panel */}
-        <main className="flex items-center justify-center px-5 py-7 md:p-10">
+        <main className="flex items-center justify-center px-3 py-7 md:p-10">
           <section className="w-full max-w-[420px]">
             <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
             <p className="text-slate-500 text-[14.5px] mt-2 mb-6">
               Sign in to your FreshMart account
             </p>
             <Alert>{error}</Alert>
+            <Alert type="success">{success}</Alert>
             <form onSubmit={handleLogin} className="grid gap-4" noValidate>
               <Field
                 icon={User}
@@ -187,7 +201,10 @@ export default function Login() {
                 <Checkbox checked={remember} onChange={setRemember}>
                   Remember me
                 </Checkbox>
-                <Link to="/forgot-password" className="lnk text-[13px]">
+                <Link
+                  to="/forgot-password"
+                  className="text-blue-700 text-semibold text-sm"
+                >
                   Forgot password?
                 </Link>
               </div>
@@ -198,7 +215,7 @@ export default function Login() {
 
             {/* 6-digit input boxes */}
             {status === "success" && (
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-4 items-center justify-center">
                 {code.map((val, i) => (
                   <input
                     key={i}
@@ -206,6 +223,11 @@ export default function Login() {
                     maxLength={1}
                     value={val}
                     onChange={(e) => handleChange(e.target.value, i)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && !val && i > 0) {
+                        inputsRef.current[i - 1].focus();
+                      }
+                    }}
                     ref={(el) => (inputsRef.current[i] = el)}
                     className="w-10 h-10 text-center border rounded focus:outline-none focus:ring-2 focus:ring-green-700"
                   />
