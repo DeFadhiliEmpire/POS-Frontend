@@ -1,6 +1,6 @@
 //Token storage, "Remember me to localStorage" else sessionStorage
 
-const KEYS = ["accessToken", "fm_user"];
+const KEYS = ["AccessToken", "user"];
 
 export function saveSession(token, user, remember) {
   clearSession();
@@ -16,8 +16,8 @@ export function saveSession(token, user, remember) {
 export function getToken() {
   try {
     return (
-      sessionStorage.getItem("accessToken") ||
-      localStorage.getItem("accessToken")
+      sessionStorage.getItem("AccessToken") ||
+      localStorage.getItem("AccessToken")
     );
   } catch {
     return null;

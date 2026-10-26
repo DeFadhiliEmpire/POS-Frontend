@@ -4,7 +4,7 @@ import { User, ShoppingCart } from "lucide-react";
 import Field, { PasswordField } from "../components/Field";
 import Checkbox from "../components/Checkbox";
 import Button from "../components/Button";
-import Alert from "../components/Alert";
+import Alert from "../components/Alert.jsx";
 import SuperLogo from "../Assets/superMarket.jpg";
 import { saveSession } from "../auth";
 
@@ -12,13 +12,15 @@ const LOCAL_API = "http://localhost:5000";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState("");
+  const [accessToken, setAccessToken] = useState(null);
+  const [user, setUser] = useState(null);
   const [status, setStatus] = useState("pending");
 
   const inputsRef = useRef([]);
@@ -26,8 +28,8 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    if (!identifier.trim() || !password) {
-      return setError("Enter your email or username and your password.");
+    if (!email.trim() || !password) {
+      return setError("Enter your email and your password.");
     }
     setLoading(true);
 
@@ -35,22 +37,37 @@ export default function Login() {
       const res = await fetch(`${LOCAL_API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data;
+
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
+
+      console.log("Login response:", res.status, data);
 
       if (!res.ok) {
-        setError(data.message || "Login Failed failed");
+        return setError(data.message || data.error || "Login failed");
       }
 
-      if (data.challenge) {
-        setChallenge(data.challenge);
-        setIdentifier("");
+      if (data.challange) {
+        setChallenge(data.challange);
+        setEmail("");
         setPassword("");
+        setCode(Array(6).fill(""));
         setStatus("success");
       }
-      saveSession(challenge, data.user, true);
+
+      // Save session with correct token
+      if (data.accessToken) {
+        saveSession(data.accessToken, data.user, remember);
+        navigate("/dashboard");
+        return;
+      }
     } catch (error) {
       console.error(error);
       setError(error.message);
@@ -77,24 +94,24 @@ export default function Login() {
     }
   };
 
-  const verifyLoginCode = async (code, remember) => {
+  const verifyLoginCode = async (code) => {
     const res = await fetch(`${LOCAL_API}/auth/verify-login-mfa`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ challenge, token: code }),
     });
-    const data = await res.json();
-
-    saveSession(data.accessToken, data.user, remember);
-
-    if (data.refreshToken) {
-      sessionStorage.setItem("refreshToken", data.refreshToken);
-    }
 
     if (!res.ok)
       throw new Error(data.message || "Failed to submit token to Login");
+
+    const data = await res.json();
+
     setStatus("pending");
     setCode(Array(6).fill(""));
+
+    setAccessToken(data.accessToken);
+    setUser(data.user);
 
     navigate("/dashboard");
   };
@@ -152,8 +169,8 @@ export default function Login() {
             <form onSubmit={handleLogin} className="grid gap-4" noValidate>
               <Field
                 icon={User}
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email or Username"
                 autoComplete="username"
                 aria-label="Email or username"
