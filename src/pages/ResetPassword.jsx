@@ -65,25 +65,35 @@ export default function ResetPassword() {
       return setMsg({ type: "error", text: "The passwords don’t match." });
     setLoading(true);
     try {
-      const res = await fetch(`${LOCAL_API}/auth/reset-password/:token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, confirmPassword }),
-      });
+      const res = await fetch(
+        `${LOCAL_API}/auth/reset-password/${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password, confirmPassword }),
+        },
+      );
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setMsg(data.message);
+      if (!res.ok || !data.success) {
+        setMsg({
+          type: "error",
+          text: data.message || "unable to reset your password.",
+        });
+        return;
       }
 
       setMsg({
         type: "success",
         text: "Password updated. Taking you to sign in…",
       });
-      setTimeout(() => navigate("/login"), 1500);
+      setTimeout(() => navigate("/login"), 2500);
     } catch (error) {
-      setMsg({ type: "error", text: error.message });
+      setMsg({
+        type: "error",
+        text: error || "Unable to contact the server. Please try again",
+      });
     } finally {
       setLoading(false);
     }
