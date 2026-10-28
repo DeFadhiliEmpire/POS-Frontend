@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Wifi, Bell, ChevronDown, Menu } from "lucide-react";
 import { useContext } from "react";
 import { AuthContext } from "../../AuthContext";
@@ -13,7 +14,10 @@ const initials = (name = "") =>
 
 export default function Topbar({ onMenu }) {
   const ref = useRef(null);
+  const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const [showProfile, setShowProfile] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -24,6 +28,19 @@ export default function Topbar({ onMenu }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, []);
 
   return (
@@ -51,8 +68,10 @@ export default function Topbar({ onMenu }) {
       </div>
       <div className="ml-auto flex items-center gap-4 sm:gap-6">
         <span className="hidden md:flex items-center gap-2 text-[13px] font-medium">
-          <i className="w-2 h-2 rounded-full bg-emerald-500" />
-          Store Online
+          <i
+            className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-red-500"} `}
+          />
+          {isOnline ? "Store Online" : "Store Offline"}
           <Wifi size={16} className="text-emerald-600" />
         </span>
         <button className="relative p-1.5" aria-label="Notifications">
@@ -69,7 +88,27 @@ export default function Topbar({ onMenu }) {
             <b className="block text-[13px]">{user.name}</b>
             <span className="text-[11px] text-slate-500">{user.role}</span>
           </span>
-          <ChevronDown size={16} className="hidden sm:block" />
+          <button onClick={() => setShowProfile(!showProfile)}>
+            <ChevronDown size={16} className="hidden sm:block" />
+          </button>
+          {showProfile && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white shadow-lg rounded-md p-3 text-sm">
+              <p className="font-semibold">{user.name}</p>
+              <p className="text-slate-500">{user.email}</p>
+              <button
+                onClick={() => navigate("/profile")}
+                className="mt-2 w-full text-left hover:bg-slate-100 p-2 rounded"
+              >
+                View Profile
+              </button>
+              <button
+                onClick={() => navigate("/logout")}
+                className="mt-1 w-full text-left hover:bg-slate-100 p-2 rounded"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
