@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { User, ShoppingCart } from "lucide-react";
 import Field, { PasswordField } from "../components/Field";
+import { useContext } from "react";
+import { AuthContext } from "../AuthContext.js";
 import Checkbox from "../components/Checkbox";
 import Button from "../components/Button";
 import Alert from "../components/Alert.jsx";
@@ -19,9 +21,8 @@ export default function Login() {
   const [loading, setLoading] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState("");
-  const [accessToken, setAccessToken] = useState(null);
-  const [user, setUser] = useState(null);
   const [status, setStatus] = useState("pending");
+  const { setUser, setAccessToken } = useContext(AuthContext);
 
   const inputsRef = useRef([]);
 
