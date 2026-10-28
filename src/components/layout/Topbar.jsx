@@ -18,6 +18,8 @@ export default function Topbar({ onMenu }) {
   const { user } = useContext(AuthContext);
   const [showProfile, setShowProfile] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -72,14 +74,39 @@ export default function Topbar({ onMenu }) {
             className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-red-500"} `}
           />
           {isOnline ? "Store Online" : "Store Offline"}
-          <Wifi size={16} className="text-emerald-600" />
+          <Wifi
+            size={16}
+            className={isOnline ? "text-emerald-600" : "text-red-600"}
+          />
         </span>
-        <button className="relative p-1.5" aria-label="Notifications">
+        <button
+          className="relative p-1.5"
+          aria-label="Notifications"
+          onClick={() => setShowNotifications(!showNotifications)}
+        >
           <Bell size={20} />
-          <b className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] grid place-items-center">
-            3
-          </b>
+          {notifications.length > 0 && (
+            <b className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] grid place-items-center">
+              {notifications.length}
+            </b>
+          )}
         </button>
+
+        {showNotifications && (
+          <div className="absolute right-0 mt-2 w-64 bg-white shadow-lg rounded-md p-3 text-sm">
+            {notifications.length === 0 ? (
+              <p className="text-slate-500">No notifications</p>
+            ) : (
+              notifications.map((n, i) => (
+                <div key={i} className="border-b last:border-0 py-2">
+                  <p className="font-medium">{n.title}</p>
+                  <p className="text-slate-500 text-xs">{n.time}</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-2.5">
           <span className="w-10 h-10 rounded-full bg-[#0b1722] text-white grid place-items-center text-[13px] font-semibold">
             {initials(user.name)}
