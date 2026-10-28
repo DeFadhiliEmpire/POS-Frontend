@@ -12,7 +12,7 @@ export default function AppLayout() {
       <div className="hidden lg:block fixed inset-y-0 left-0 w-[240px] z-20">
         <Sidebar />
       </div>
-      //mobile responiveness
+      {/*mobile responiveness*/}
       {open && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
           <div className="w-[240px]">

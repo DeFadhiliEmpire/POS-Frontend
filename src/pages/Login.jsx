@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { User, ShoppingCart } from "lucide-react";
 import Field, { PasswordField } from "../components/Field";
 import { useContext } from "react";
-import { AuthContext } from "../AuthContext.js";
+import { AuthContext } from "../AuthContext.jsx";
 import Checkbox from "../components/Checkbox";
 import Button from "../components/Button";
 import Alert from "../components/Alert.jsx";
@@ -127,7 +127,7 @@ export default function Login() {
     setAccessToken(data.accessToken);
     setUser(data.user);
 
-    navigate("/dashboard");
+    navigate("/sales");
   };
 
   useEffect(() => {
@@ -204,7 +204,7 @@ export default function Login() {
                 </Checkbox>
                 <Link
                   to="/forgot-password"
-                  className="text-blue-700 text-semibold text-sm"
+                  className="text-[13px] text-[#1a56c4] font-medium hover:underline"
                 >
                   Forgot password?
                 </Link>

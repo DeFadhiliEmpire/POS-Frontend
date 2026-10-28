@@ -9,7 +9,9 @@ export default function Field({ icon: Icon, className = "", ...props }) {
     <div className="relative">
       {Icon && <Icon size={18} strokeWidth={1.8} className={iconCls} />}
       <input
-        className={`w-full h-12 rounded-lg border border-line bg-slate-50 px-3.5 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-green-600 focus:ring-2 focus:ring-green-600 focus:ring-opacity-40 ${Icon ? "pl-11" : ""} ${className}`}
+        className={`w-full h-12 rounded-[10px] border border-[#dfe5ec] bg-slate-50 px-3.5 text-[15px] text-ink
+           placeholder:text-slate-400 transition
+           focus:outline-none focus:bg-white focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20 pl-11 pr-11 ${Icon ? "pl-11" : ""} ${className}`}
         {...props}
       />
     </div>
@@ -23,7 +25,9 @@ export function PasswordField({ icon: Icon = Lock, ...props }) {
       <Icon size={18} strokeWidth={1.8} className={iconCls} />
       <input
         type={show ? "text" : "password"}
-        className="w-full h-12 rounded-lg border border-line bg-slate-50 px-3.5 text-sm text-ink placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-green-600 focus:ring-2 focus:ring-green-600 focus:ring-opacity-20 pl-11 pr-11"
+        className="w-full h-12 rounded-[10px] border border-[#dfe5ec] bg-slate-50 px-3.5 text-[15px] text-ink
+           placeholder:text-slate-400 transition
+           focus:outline-none focus:bg-white focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20 pl-11 pr-11"
         {...props}
       />
       <button

@@ -115,7 +115,7 @@ export default function ForgotPassword() {
 
             <Link
               to="/login"
-              className="inline-flex items-center gap-1.5 mt-5 text-sm text-blue-700 text-semibold hover:underline"
+              className="inline-flex items-center gap-1.5 mt-5  text-[13px] text-[#1a56c4] font-medium hover:underline"
             >
               <ArrowLeft size={15} /> Back to sign in
             </Link>

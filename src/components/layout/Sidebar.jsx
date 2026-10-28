@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -38,11 +39,25 @@ const initials = (name = "") =>
 export default function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   return (
     <aside className="h-full w-[240px] bg-[#0b1722] text-slate-300 flex flex-col">
       <div className="flex items-center gap-3 px-5 pt-6 pb-7">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-brand grid place-items-center text-white font-extrabold text-xl">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-brand grid place-items-center text-white font-extrabold text-xl">
           {user?.businessName?.[0] || "?"}
         </div>
         <div className="leading-tight">
@@ -88,7 +103,7 @@ export default function Sidebar({ onNavigate }) {
         </button>
         <div className="flex items-center gap-3 px-3 py-2">
           <span className="w-9 h-9 rounded-full bg-white/10 grid place-items-center text-[12px] font-semibold text-white">
-            {initials(user.name)}
+            {initials(user?.name || "")}
           </span>
           <span className="flex-1 leading-tight">
             <b className="block text-[13px] text-white font-semibold">
@@ -110,9 +125,22 @@ export default function Sidebar({ onNavigate }) {
           </button>
         </div>
         <div className="flex items-center gap-3 rounded-xl bg-emerald-500/10 border border-emerald-400/20 px-3 py-2.5 text-[12px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span
+            className={
+              isOnline
+                ? "w-2 h-2 rounded-full bg-emerald-600"
+                : "w-2 h-2 rounded-full bg-red-600"
+            }
+          />
           <span className="leading-tight">
-            <b className="block text-emerald-300 font-medium">Online</b>
+            <b
+              className={`font-medium transition-colors duration-300 ${
+                isOnline ? "text-emerald-300" : "text-red-600"
+              }`}
+            >
+              {isOnline ? "Online" : "Offline"}
+            </b>
+
             <span className="text-[11px] text-slate-400">
               Last sync: 2 min ago
             </span>

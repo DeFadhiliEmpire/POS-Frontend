@@ -109,19 +109,21 @@ export default function Topbar({ onMenu }) {
 
         <div className="flex items-center gap-2.5">
           <span className="w-10 h-10 rounded-full bg-[#0b1722] text-white grid place-items-center text-[13px] font-semibold">
-            {initials(user.name)}
+            {initials(user?.name || "")}
           </span>
           <span className="hidden sm:block leading-tight">
-            <b className="block text-[13px]">{user.name}</b>
-            <span className="text-[11px] text-slate-500">{user.role}</span>
+            <b className="block text-[13px]">{user?.name || ""}</b>
+            <span className="text-[11px] text-slate-500">
+              {user?.role || ""}
+            </span>
           </span>
           <button onClick={() => setShowProfile(!showProfile)}>
             <ChevronDown size={16} className="hidden sm:block" />
           </button>
           {showProfile && (
             <div className="absolute right-0 top-full mt-2 w-48 bg-white shadow-lg rounded-md p-3 text-sm">
-              <p className="font-semibold">{user.name}</p>
-              <p className="text-slate-500">{user.email}</p>
+              <p className="font-semibold">{initials(user?.name || "")}</p>
+              <p className="text-slate-500">{user?.email || ""}</p>
               <button
                 onClick={() => navigate("/profile")}
                 className="mt-2 w-full text-left hover:bg-slate-100 p-2 rounded"

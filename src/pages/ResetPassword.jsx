@@ -184,7 +184,7 @@ export default function ResetPassword() {
             </form>
             <Link
               to="/login"
-              className="lnk inline-flex items-center gap-1.5 mt-5 text-[13.5px]"
+              className=" text-[#1a56c4] font-medium hover:underline inline-flex items-center gap-1.5 mt-5 text-[13.5px]"
             >
               <ArrowLeft size={15} /> Back to sign in
             </Link>
