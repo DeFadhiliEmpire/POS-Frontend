@@ -14,7 +14,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useContext } from "react";
-import { AuthContext } from "../AuthContext";
+import { AuthContext } from "../../AuthContext";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
