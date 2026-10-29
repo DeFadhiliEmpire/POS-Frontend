@@ -118,21 +118,23 @@ export default function Topbar({ onMenu }) {
             </span>
           </span>
           <button onClick={() => setShowProfile(!showProfile)}>
-            <ChevronDown size={16} className="hidden sm:block" />
+            <ChevronDown size={16} className="hidden sm:block cursor-pointer" />
           </button>
           {showProfile && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white shadow-lg rounded-md p-3 text-sm">
-              <p className="font-semibold">{initials(user?.name || "")}</p>
+            <div className="absolute right-0 top-0 mt-12 mr-2 w-48 bg-black shadow-lg rounded-md p-3 text-sm overflow-hidden">
+              <p className="font-semibold text-white">
+                {initials(user?.name || "")}
+              </p>
               <p className="text-slate-500">{user?.email || ""}</p>
               <button
                 onClick={() => navigate("/profile")}
-                className="mt-2 w-full text-left hover:bg-slate-100 p-2 rounded"
+                className="mt-2 w-full text-left bg-gradient-to-r from-[#0f5c41] to-[#0d3f31] text-white border-l-[3px] border-emerald-400 hover:bg-slate-100 p-2 rounded cursor-pointer"
               >
                 View Profile
               </button>
               <button
                 onClick={() => navigate("/logout")}
-                className="mt-1 w-full text-left hover:bg-slate-100 p-2 rounded"
+                className="mt-1 w-full text-left  p-2 rounded bg-gradient-to-r from-[#0f5c41] to-[#0d3f31] text-white border-l-[3px] border-emerald-400 hover:bg-slate-100 cursor-pointer"
               >
                 Logout
               </button>
