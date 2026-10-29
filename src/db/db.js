@@ -10,6 +10,17 @@ db.version(1).stores({
   counters: "++id,key,value",
 });
 
+db.version(2).stores({
+  products: "productId,name,sku,barcode,categoryId,isActive",
+  sales: "clientSaleId,syncStatus,occurredAt",
+  pendingSync: "++id,[type+referenceId],status,createdAt",
+  device: "deviceId",
+  counters: "++id,key,value",
+
+  categories: "categoryId,name,isActive",
+  catalogueSync: "++id,[entityType+entityId],status,createdAt",
+});
+
 const getNextCounter = async (key) => {
   let counter = await db.counters.where("key").equals(key).first();
   if (!counter) {

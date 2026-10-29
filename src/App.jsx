@@ -4,6 +4,7 @@ import Login from "./pages/Login.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales.jsx";
+import Products from "./pages/Products.jsx";
 import TestProducts from "./TestProducts";
 import TestOfflineSale from "./TestOfflineSale";
 import TestOnlineSaleSync from "./TestOnlineSaleSync";
@@ -31,6 +32,7 @@ function App() {
         {/* App tabs – all share <Sidebar/> + <Topbar/> through AppLayout */}
         <Route element={<AppLayout />}>
           <Route path="/sales" element={<Sales />} />
+          <Route path="/products" element={<Products />} />
         </Route>
       </Routes>
     </BrowserRouter>
