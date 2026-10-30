@@ -137,4 +137,5 @@ export {
   getProductById,
   searchProducts,
   clearProducts,
+  updateProductLocally,
 };
