@@ -24,7 +24,14 @@ const queueCatalogueOperation = async ({
     .first();
 
   // Coalesce multiple unsynced edits into one operation.
+
   if (existing) {
+    // Entity was created locally but never sent to the server.
+    if (existing.action === "create" && action === "deactivate") {
+      await db.catalogueSync.delete(existing.id);
+      return existing.operationId;
+    }
+
     if (existing.action === "create") {
       await db.catalogueSync.update(existing.id, {
         payload: {

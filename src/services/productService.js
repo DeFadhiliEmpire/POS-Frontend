@@ -256,6 +256,48 @@ const getProductById = async (productId) => {
   }
 };
 
+const saveProducts = async (products) => {
+  if (!Array.isArray(products)) {
+    throw new Error("Products must be an array");
+  }
+
+  await db.transaction("rw", db.products, db.categories, async () => {
+    for (const product of products) {
+      const productId = String(product._id || product.productId);
+
+      if (!productId || productId === "undefined") continue;
+
+      const existing = await db.products.get(productId);
+
+      if (existing && ["pending", "conflict"].includes(existing.syncStatus)) {
+        continue;
+      }
+
+      await db.products.put({
+        productId,
+        name: product.name,
+        sku: product.sku,
+        barcode: product.barcode || "",
+        categoryId: String(
+          product.category?._id || product.categoryId || product.category,
+        ),
+        buyingPrice: product.buyingPrice,
+        sellingPrice: product.sellingPrice,
+        lowStockThreshold: product.lowStockThreshold,
+        stockQuantity: product.stockQuantity ?? 0,
+        unit: product.unit,
+        imageUrl: product.imageUrl || "",
+        isActive: product.isActive,
+        version: product.version || 1,
+        syncStatus: "synced",
+        lastSyncedAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  return { success: true, message: "Products saved successfully" };
+};
+
 const searchProducts = async (searchTerm) => {
   try {
     if (!searchTerm?.trim()) {
@@ -289,4 +331,5 @@ export {
   getProducts,
   getProductById,
   searchProducts,
+  saveProducts,
 };
