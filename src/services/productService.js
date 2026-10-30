@@ -1,18 +1,48 @@
 import { db } from "../db/db.js";
 
 const saveProducts = async (products) => {
+  if (!Array.isArray(products)) {
+    throw new Error("Product must be an array");
+  }
+
   try {
-    if (!Array.isArray(products)) {
-      throw new Error("Product must be an array");
-    }
+    let saved = 0;
+    let preserved = 0;
 
-    await db.products.bulkPut(products);
+    await db.transaction("rw", db.products, async () => {
+      for (const product of products) {
+        if (!product.productId) {
+          continue;
+        }
 
-    return { success: true, message: "Product saved successfully" };
-  } catch (err) {
-    console.error("Failed to save products:", err);
+        const existing = await db.products.get(product.productId);
 
-    throw err;
+        // Never overwrite an unresolved local edit.
+        if (existing && ["pending", "conflict"].includes(existing.syncStatus)) {
+          preserved++;
+          continue;
+        }
+
+        await db.products.put({
+          ...existing,
+          ...product,
+          syncStatus: "synced",
+          lastSyncedAt: new Date().toISOString(),
+        });
+
+        saved++;
+      }
+    });
+
+    return {
+      success: true,
+      message: "Products saved successfully",
+      saved,
+      preserved,
+    };
+  } catch (error) {
+    console.error("Failed to save products:", error);
+    throw error;
   }
 };
 
@@ -43,23 +73,20 @@ const getProductById = async (productId) => {
 
 const searchProducts = async (searchTerm) => {
   try {
-    if (!searchTerm) {
+    if (!searchTerm?.trim()) {
       return [];
     }
 
     const term = searchTerm.toLowerCase();
 
-    const products = await db.products
-      .filter((product) => {
-        return (
+    return db.products
+      .filter(
+        (product) =>
           product.name?.toLowerCase().includes(term) ||
           product.sku?.toLowerCase().includes(term) ||
-          product.barcode?.toLowerCase().includes(term)
-        );
-      })
+          product.barcode?.toLowerCase().includes(term),
+      )
       .toArray();
-
-    return products;
   } catch (err) {
     console.error("Failed to search products:", err);
 
@@ -69,14 +96,40 @@ const searchProducts = async (searchTerm) => {
 
 const clearProducts = async () => {
   try {
-    await db.products.clear();
-
-    return { success: true, message: "Products cleared successfully" };
+    throw new Error(
+      "Clearing the product cache is disabled to protect local data.",
+    );
   } catch (err) {
     console.error("Failed to clear products:", err);
     throw err;
   }
 };
+
+async function updateProductLocally(productId, changes) {
+  await db.transaction("rw", db.products, db.catalogueSync, async () => {
+    const product = await db.products.get(productId);
+
+    if (!product) {
+      throw new Error("Product not found locally");
+    }
+
+    await db.product.put({
+      ...product,
+      ...changes,
+      syncStatus: "pending",
+      updatedAt: new Date().toISOString(),
+    });
+
+    await db.catalogueSync.add({
+      entityType: "Product",
+      entityId: productId,
+      operation: "update",
+      changes,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    });
+  });
+}
 
 export {
   saveProducts,

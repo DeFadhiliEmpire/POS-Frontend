@@ -1,4 +1,5 @@
 import { fetchProducts } from "./productApi";
+import { fetchCategories } from "./categoryApi.js";
 import { saveProducts } from "./productService";
 import { db } from "../db/db.js";
 
@@ -38,6 +39,43 @@ const syncProducts = async (token) => {
     console.error("Product synchronization failed:", err);
 
     throw err;
+  }
+};
+
+const syncCategories = async (token) => {
+  try {
+    if (!navigator.onLine) {
+      return {
+        success: false,
+        message: "No internet connection",
+      };
+    }
+
+    if (!token) {
+      throw new Error("Authentication token is required");
+    }
+
+    const data = await fetchCategories(token);
+    // Preserve the local naming convention.
+    const categories = data.categories.map((category) => ({
+      categoryId: category._id,
+      name: category.name,
+      description: category.description || "",
+      isActive: category.isActive,
+    }));
+
+    await db.transaction("rw", db.categories, async () => {
+      await db.categories.bulkPut(categories);
+    });
+
+    return {
+      success: true,
+      message: "Categories synchronized successfully",
+      count: categories.length,
+    };
+  } catch (error) {
+    console.error("Category synchronization failed:", error);
+    throw error;
   }
 };
 
@@ -249,4 +287,9 @@ const startAutomaticSaleSync = (getToken, onResult) => {
   };
 };
 
-export { syncProducts, syncOfflineSales, startAutomaticSaleSync };
+export {
+  syncProducts,
+  syncCategories,
+  syncOfflineSales,
+  startAutomaticSaleSync,
+};
