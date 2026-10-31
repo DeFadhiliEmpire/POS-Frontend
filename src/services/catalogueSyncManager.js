@@ -1,11 +1,10 @@
 import { db } from "../db/db.js";
+import { getDeviceId } from "../db/device.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const MAX_OPERATIONS = 50;
 const MAX_DOWNLOAD_PAGES = 10;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getCursor = async () => {
   const record = await db.syncMeta.get("catalogueCursor");
@@ -47,9 +46,6 @@ const getPendingOperations = async () => {
 const updateLocalEntityAfterUpload = async (operation, result) => {
   const table =
     operation.entityType === "product" ? db.products : db.categories;
-
-  const primaryKey =
-    operation.entityType === "product" ? "productId" : "categoryId";
 
   await table.update(operation.entityId, {
     version: result.serverVersion,
@@ -190,16 +186,6 @@ const sendCatalogueBatch = async (token, operations, cursor) => {
   return data;
 };
 
-const getDeviceId = async () => {
-  const device = await db.device.toCollection().first();
-
-  if (!device?.deviceId) {
-    throw new Error("Device ID has not been registered");
-  }
-
-  return device.deviceId;
-};
-
 const syncCatalogue = async (getToken) => {
   if (!navigator.onLine) {
     return {
@@ -213,6 +199,12 @@ const syncCatalogue = async (getToken) => {
 
   if (!token) {
     throw new Error("Authentication required for catalogue synchronization");
+  }
+
+  const bootstrapped = await db.syncMeta.get("catalogueBootstrapped");
+
+  if (!bootstrapped?.value) {
+    await bootstrapCatalogue(token);
   }
 
   let cursor = await getCursor();
@@ -281,15 +273,43 @@ const syncCatalogue = async (getToken) => {
   };
 };
 
-export { syncCatalogue };
-
-let catalogueSyncRunning = false;
-
 const startAutomaticCatalogueSync = (getToken, onResult) => {
-  const runSync = async () => {
-    if (catalogueSyncRunning || !navigator.onLine) return;
+  let running = false;
+  let retryTimer = null;
+  let stopped = false;
 
-    catalogueSyncRunning = true;
+  const scheduleRetry = async () => {
+    if (stopped || !navigator.onLine) return;
+
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    const pending = await db.catalogueSync
+      .where("status")
+      .equals("pending")
+      .toArray();
+
+    if (!pending.length) return;
+
+    const now = Date.now();
+
+    const nextRetry = pending
+      .map((operation) =>
+        operation.nextRetryAt ? new Date(operation.nextRetryAt).getTime() : now,
+      )
+      .reduce((earliest, time) => Math.min(earliest, time), Infinity);
+
+    const delay = Math.max(0, nextRetry - now);
+
+    retryTimer = setTimeout(runSync, delay);
+  };
+
+  const runSync = async () => {
+    if (running || stopped || !navigator.onLine) return;
+
+    running = true;
 
     try {
       const result = await syncCatalogue(getToken);
@@ -301,17 +321,67 @@ const startAutomaticCatalogueSync = (getToken, onResult) => {
         message: error.message,
       });
     } finally {
-      catalogueSyncRunning = false;
+      running = false;
+      await scheduleRetry();
     }
   };
 
-  window.addEventListener("online", runSync);
+  const handleOnline = () => {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    runSync();
+  };
+
+  window.addEventListener("online", handleOnline);
 
   runSync();
 
   return () => {
-    window.removeEventListener("online", runSync);
+    stopped = true;
+
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+    }
+
+    window.removeEventListener("online", handleOnline);
   };
 };
 
-export { startAutomaticCatalogueSync };
+const bootstrapCatalogue = async (token) => {
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  const deviceId = await getDeviceId();
+
+  const res = await fetch(`${API_URL}/sync/catalogue/bootstrap`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "x-device-id": deviceId,
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Catalogue bootstrap failed");
+  }
+
+  await applyDownloadedChanges({
+    categories: data.snapshot.categories,
+    products: data.snapshot.products,
+  });
+
+  await saveCursor(data.snapshot.cursor);
+
+  await db.syncMeta.put({
+    key: "catalogueBootstrapped",
+    value: true,
+  });
+
+  return data.snapshot;
+};
+
+export { startAutomaticCatalogueSync, syncCatalogue };

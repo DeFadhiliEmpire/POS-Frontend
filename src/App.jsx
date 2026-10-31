@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import AppLayout from "./components/layout/AppLayout.jsx";
 import Login from "./pages/Login.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales.jsx";
 import Products from "./pages/Products.jsx";
+import { startAutomaticCatalogueSync } from "./services/catalogueSyncManager.js";
 import TestProducts from "./TestProducts";
 import TestOfflineSale from "./TestOfflineSale";
 import TestOnlineSaleSync from "./TestOnlineSaleSync";
@@ -16,6 +18,14 @@ function App() {
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YWJhYmUxOWE3N2UzNjMwZjg4MTRhYTgiLCJlbWFpbCI6Im1vc2VzQGV4YW1wbGUuY29tIiwibmFtZSI6Ik1vc2VzIEZhZGhpbGkgTWFzaGEiLCJyb2xlIjoib3duZXIiLCJidXNpbmVzc0lkIjoiNmFiYWJlMTdhNzdlMzYzMGY4ODE0YWE3IiwiaXNBY3RpdmUiOnRydWUsImlhdCI6MTc5MjUzMDExMCwiZXhwIjoxNzkyNTMzNzEwfQ.NALBnxDUS4zG54wv7Rw5LTnW5HQ_o_13Ec3Wy2DaiX0";
     return token;
   };
+
+  useEffect(() => {
+    const stopCatalogueSync = startAutomaticCatalogueSync(getToken);
+
+    return () => {
+      stopCatalogueSync();
+    };
+  }, []);
 
   return (
     <BrowserRouter>

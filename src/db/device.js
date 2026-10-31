@@ -6,17 +6,30 @@ const generateDeviceId = () => {
 
 const getDeviceId = async () => {
   try {
-    const existingDevice = await db.device.toCollection().first();
+    return db.transaction("rw", db.syncMeta, db.device, async () => {
+      const saved = await db.syncMeta.get("deviceId");
 
-    if (existingDevice) {
-      return existingDevice.deviceId;
-    }
+      if (saved?.value) {
+        return saved.value;
+      }
 
-    const deviceId = generateDeviceId();
-    const deviceName = getDeviceName();
-    await db.device.put({ deviceId, deviceName });
+      const existingDevice = await db.device.toCollection().first();
 
-    return deviceId;
+      if (existingDevice) {
+        return existingDevice.deviceId;
+      }
+
+      const deviceId = generateDeviceId();
+      const deviceName = getDeviceName();
+
+      await db.syncMeta.put({
+        key: "deviceId",
+        value: deviceId,
+      });
+      await db.device.put({ deviceId, deviceName });
+
+      return deviceId;
+    });
   } catch (err) {
     console.error("Failed to get device ID:", err);
     throw err;

@@ -22,7 +22,7 @@ export const fetchProducts = async (token) => {
   }
 };
 
-export const updateProducts = async (token, product) => {
+export const updateProducts = async (token, product, updatedFields) => {
   try {
     const res = await fetch(`${API_URL}/products/${product.productId}`, {
       method: "PUT",
