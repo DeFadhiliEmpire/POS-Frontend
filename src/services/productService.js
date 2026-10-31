@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 
 import { createObjectId, queueCatalogueOperation } from "./catalogueQueue.js";
+import { saveCatalogueImageLocally } from "./catalogueImageService.js";
 
 const validateProduct = (product) => {
   if (!product.name?.trim()) {
@@ -34,6 +35,7 @@ const validateProduct = (product) => {
 };
 
 const createProduct = async (input) => {
+  const { imageFile } = input;
   validateProduct(input);
 
   return db.transaction(
@@ -41,6 +43,7 @@ const createProduct = async (input) => {
     db.products,
     db.categories,
     db.catalogueSync,
+    db.catalogueImages,
     async () => {
       const category = await db.categories.get(input.categoryId);
 
@@ -58,6 +61,14 @@ const createProduct = async (input) => {
 
       const productId = createObjectId();
 
+      if (imageFile) {
+        await saveCatalogueImageLocally({
+          entityType: "product",
+          entityId: productId,
+          file: imageFile,
+        });
+      }
+
       const product = {
         productId,
         name: input.name.trim(),
@@ -68,7 +79,8 @@ const createProduct = async (input) => {
         sellingPrice: input.sellingPrice,
         lowStockThreshold: input.lowStockThreshold ?? 5,
         unit: input.unit || "piece",
-        imageUrl: input.imageUrl || "",
+        imageUrl: "",
+        imagePublicId: "",
         stockQuantity: 0,
         isActive: true,
         version: 0,
@@ -91,7 +103,8 @@ const createProduct = async (input) => {
           sellingPrice: product.sellingPrice,
           lowStockThreshold: product.lowStockThreshold,
           unit: product.unit,
-          imageUrl: product.imageUrl,
+          imageUrl: "",
+          imagePublicId: "",
         },
       });
 
@@ -101,6 +114,8 @@ const createProduct = async (input) => {
 };
 
 const updateProduct = async (productId, changes) => {
+  const { imageFile, removeImage } = changes;
+
   const allowedFields = [
     "name",
     "sku",
@@ -110,7 +125,6 @@ const updateProduct = async (productId, changes) => {
     "sellingPrice",
     "lowStockThreshold",
     "unit",
-    "imageUrl",
   ];
 
   const cleanChanges = {};
@@ -126,6 +140,7 @@ const updateProduct = async (productId, changes) => {
     db.products,
     db.categories,
     db.catalogueSync,
+    db.catalogueImages,
     async () => {
       const product = await db.products.get(productId);
 
@@ -147,16 +162,12 @@ const updateProduct = async (productId, changes) => {
       updated.name = updated.name.trim();
       updated.sku = updated.sku.trim().toUpperCase();
 
-      if (cleanChanges.categoryId || cleanChanges.category) {
-        const categoryId = cleanChanges.categoryId || cleanChanges.category;
-
-        const category = await db.categories.get(categoryId);
+      if (cleanChanges.categoryId) {
+        const category = await db.categories.get(cleanChanges.categoryId);
 
         if (!category || !category.isActive) {
           throw new Error("Select an active category");
         }
-
-        updated.categoryId = categoryId;
       }
 
       const duplicate = await db.products
@@ -172,7 +183,20 @@ const updateProduct = async (productId, changes) => {
         throw new Error("Another product already uses this SKU");
       }
 
-      delete updated.category;
+      if (imageFile) {
+        await saveCatalogueImageLocally({
+          entityType: "product",
+          entityId: productId,
+          file: imageFile,
+        });
+      }
+
+      if (removeImage) {
+        await db.catalogueImages.delete(["product", productId]);
+
+        updated.imageUrl = "";
+        updated.imagePublicId = "";
+      }
 
       await db.products.put({
         ...updated,
@@ -187,13 +211,14 @@ const updateProduct = async (productId, changes) => {
         payload: {
           name: updated.name,
           sku: updated.sku,
-          barcode: updated.barcode,
+          barcode: updated.barcode || "",
           category: updated.categoryId,
           buyingPrice: updated.buyingPrice,
           sellingPrice: updated.sellingPrice,
           lowStockThreshold: updated.lowStockThreshold,
           unit: updated.unit,
-          imageUrl: updated.imageUrl,
+          imageUrl: removeImage ? "" : updated.imageUrl || "",
+          imagePublicId: removeImage ? "" : updated.imagePublicId || "",
         },
       });
 

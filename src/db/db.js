@@ -33,6 +33,19 @@ db.version(3).stores({
   syncMeta: "key",
 });
 
+db.version(4).stores({
+  products: "productId,name,sku,barcode,categoryId,isActive,syncStatus,version",
+  sales: "clientSaleId,syncStatus,occurredAt",
+  pendingSync: "++id,[type+referenceId],status,createdAt",
+  device: "deviceId",
+  counters: "++id,key,value",
+  categories: "categoryId,name,isActive,syncStatus,version",
+  catalogueSync:
+    "++id,operationId,[entityType+entityId],entityType,entityId,status,createdAt",
+  syncMeta: "key",
+  catalogueImages: "[entityType+entityId],entityType,entityId,status,createdAt",
+});
+
 const getNextCounter = async (key) => {
   let counter = await db.counters.where("key").equals(key).first();
   if (!counter) {

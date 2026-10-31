@@ -1,254 +1,468 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { X, Loader2, ImagePlus, Trash2 } from "lucide-react";
+
 import Alert from "./Alert";
+import { validateCatalogueImage } from "../services/catalogueImageService.js";
 
-const MAX_MB = 2;
+import { createProduct, updateProduct } from "../services/productService.js";
 
-export default function ProductModal({ product, onClose, onSaved }) {
+export default function ProductModal({
+  product,
+  categories = [],
+  onClose,
+  onSaved,
+}) {
   const editing = Boolean(product);
   const fileRef = useRef(null);
-  const [f, setF] = useState({
-    name: product?.name ?? "",
-    category: product?.category ?? CATEGORY[0],
-    price: product?.price ?? "",
-    stock: product?.stock ?? "",
-    lowStockAt: product?.lowStockAt ?? 5,
+
+  const [form, setForm] = useState({
+    name: product?.name || "",
+    sku: product?.sku || "",
+    barcode: product?.barcode || "",
+    categoryId: product?.categoryId || "",
+    buyingPrice: product?.buyingPrice ?? "",
+    sellingPrice: product?.sellingPrice ?? "",
+    lowStockThreshold: product?.lowStockThreshold ?? 5,
+    unit: product?.unit || "piece",
   });
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(product?.imageUrl ?? null);
+
+  const [imageFile, setImageFile] = useState(null);
+  const [preview, setPreview] = useState(product?.imageUrl || "");
   const [removeImage, setRemoveImage] = useState(false);
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.terget.value }));
-
+  // Create and clean up the temporary preview URL.
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    if (!imageFile) return;
 
-  function pickImage(e) {
-    const picked = e.target.files?.[0];
-    if (!picked) return;
-    if (!picked.type.startsWith("image/"))
-      return setError("Please choose an image file.");
-    if (picked.size > MAX_MB * 1024 * 1024)
-      return setError(`Image must be smaller than ${MAX_MB}MB.`);
-    setError("");
-    setFile(picked);
-    setPreview(URL.createObjectURL(picked));
-    setRemoveImage(false);
-  }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPreview(objectUrl);
 
-  function clearImage() {
-    setFile(null);
-    setPreview(null);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
+  // Close modal using Escape.
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !saving) {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, saving]);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleImageChange = (event) => {
+    const selectedFile = event.target.files?.[0];
+
+    if (!selectedFile) return;
+
+    try {
+      validateCatalogueImage(selectedFile);
+
+      setError("");
+      setImageFile(selectedFile);
+      setRemoveImage(false);
+    } catch (err) {
+      setError(err.message);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setPreview("");
     setRemoveImage(true);
-    if (fileRef.current) fileRef.current.value = "";
-  }
 
-  async function submit(e) {
-    e.preventDefault();
-    setError("");
-    if (!f.name.trim()) return setError("Product name is required.");
-    if (f.price === "" || Number(f.price) < 0)
-      return setError("Enter a valid price.");
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+  };
+
+  const validateForm = () => {
+    if (!form.name.trim()) {
+      return "Product name is required.";
+    }
+
+    if (!form.sku.trim()) {
+      return "Product SKU is required.";
+    }
+
+    if (!form.categoryId) {
+      return "Please select a product category.";
+    }
+
     if (
-      f.stock === "" ||
-      Number(f.stock) < 0 ||
-      !Number.isInteger(Number(f.stock))
-    )
-      return setError("Stock must be a whole number (0 or more).");
+      form.buyingPrice === "" ||
+      !Number.isFinite(Number(form.buyingPrice)) ||
+      Number(form.buyingPrice) < 0
+    ) {
+      return "Enter a valid buying price.";
+    }
 
-    const fd = new FormData();
-    Object.entries({ ...f, name: f.name.trim() }).forEach(([k, v]) =>
-      fd.append(k, v),
-    );
-    if (file) fd.append("image", file);
-    if (editing && removeImage) fd.append("removeImage", "true");
+    if (
+      form.sellingPrice === "" ||
+      !Number.isFinite(Number(form.sellingPrice)) ||
+      Number(form.sellingPrice) < 0
+    ) {
+      return "Enter a valid selling price.";
+    }
+
+    if (
+      form.lowStockThreshold === "" ||
+      !Number.isInteger(Number(form.lowStockThreshold)) ||
+      Number(form.lowStockThreshold) < 0
+    ) {
+      return "Enter a valid low-stock threshold.";
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+
+    const validationError = validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     setSaving(true);
+
     try {
-      await saveProduct(fd, product?.id);
-      onSaved(editing ? "Product update" : "Product added.");
-    } catch (error) {
-      setError(error.message);
+      const payload = {
+        name: form.name.trim(),
+        sku: form.sku.trim().toUpperCase(),
+        barcode: form.barcode.trim(),
+        categoryId: form.categoryId,
+        buyingPrice: Number(form.buyingPrice),
+        sellingPrice: Number(form.sellingPrice),
+        lowStockThreshold: Number(form.lowStockThreshold),
+        unit: form.unit,
+        imageFile,
+        removeImage: editing && !imageFile && removeImage,
+      };
+
+      if (editing) {
+        await updateProduct(product.productId, payload);
+      } else {
+        await createProduct(payload);
+      }
+
+      onSaved?.(
+        editing
+          ? "Product updated successfully."
+          : "Product added successfully.",
+      );
+    } catch (err) {
+      setError(err.message || "Unable to save product.");
     } finally {
       setSaving(false);
     }
-  }
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-4 bg-slate-900/50"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) {
+          onClose();
+        }
+      }}
     >
       <form
-        onSubmit={submit}
+        onSubmit={handleSubmit}
         noValidate
         role="dialog"
         aria-modal="true"
-        aria-labelledby="pm-title"
-        className="w-full max-w-[520px] max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-6"
+        aria-labelledby="product-modal-title"
+        className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
       >
-        <div className="flex items-center justify-between mb-5">
-          <h2 id="pm-title" className="text-lg font-bold">
-            {editing ? "Edit product" : "Add product"}
-          </h2>
+        {/* Header */}
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2
+              id="product-modal-title"
+              className="text-lg font-bold text-slate-900"
+            >
+              {editing ? "Edit product" : "Add new product"}
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Enter product details and catalogue information.
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             aria-label="Close"
-            className="p-1.5 rounded-lg hover:bg-slate-100"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
           >
-            <X size={18} />
+            <X size={19} />
           </button>
         </div>
-        <Alert>{error}</Alert>
 
-        <div className="grid gap-4">
-          <div>
-            <label className="lbl" htmlFor="pm-name">
+        {error && (
+          <div className="mb-4">
+            <Alert>{error}</Alert>
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Product name */}
+          <div className="sm:col-span-2">
+            <label className="lbl" htmlFor="product-name">
               Product name
             </label>
+
             <input
-              id="pm-name"
-              className="input"
-              value={f.name}
-              onChange={set("name")}
+              id="product-name"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
               placeholder="e.g. Coca Cola 500ml"
-              autoFocus
+              className="input"
+              required
             />
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="lbl" htmlFor="pm-cat">
-                Category
-              </label>
-              <select
-                id="pm-cat"
-                className="input"
-                value={f.category}
-                onChange={set("category")}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="lbl" htmlFor="pm-price">
-                Price (KSh)
-              </label>
-              <input
-                id="pm-price"
-                type="number"
-                min="0"
-                step="0.01"
-                className="input"
-                value={f.price}
-                onChange={set("price")}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="lbl" htmlFor="pm-stock">
-                Stock
-              </label>
-              <input
-                id="pm-stock"
-                type="number"
-                min="0"
-                step="1"
-                className="input"
-                value={f.stock}
-                onChange={set("stock")}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="lbl" htmlFor="pm-low">
-                Low stock at
-              </label>
-              <input
-                id="pm-low"
-                type="number"
-                min="0"
-                step="1"
-                className="input"
-                value={f.lowStockAt}
-                onChange={set("lowStockAt")}
-              />
-            </div>
+
+          {/* SKU */}
+          <div>
+            <label className="lbl" htmlFor="product-sku">
+              SKU
+            </label>
+
+            <input
+              id="product-sku"
+              name="sku"
+              value={form.sku}
+              onChange={handleChange}
+              placeholder="e.g. COKE-500"
+              className="input"
+              required
+            />
           </div>
 
+          {/* Barcode */}
           <div>
-            <span className="lbl">
-              Image{" "}
-              <span className="font-normal text-slate-400">(optional)</span>
-            </span>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl border border-dashed border-slate-300 bg-slate-50 grid place-items-center overflow-hidden shrink-0">
+            <label className="lbl" htmlFor="product-barcode">
+              Barcode
+            </label>
+
+            <input
+              id="product-barcode"
+              name="barcode"
+              value={form.barcode}
+              onChange={handleChange}
+              placeholder="Optional barcode"
+              className="input"
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="lbl" htmlFor="product-category">
+              Category
+            </label>
+
+            <select
+              id="product-category"
+              name="categoryId"
+              value={form.categoryId}
+              onChange={handleChange}
+              className="input"
+              required
+            >
+              <option value="">Select category</option>
+
+              {categories
+                .filter((category) => category.isActive)
+                .map((category) => (
+                  <option key={category.categoryId} value={category.categoryId}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Unit */}
+          <div>
+            <label className="lbl" htmlFor="product-unit">
+              Unit
+            </label>
+
+            <select
+              id="product-unit"
+              name="unit"
+              value={form.unit}
+              onChange={handleChange}
+              className="input"
+            >
+              {["piece", "kg", "g", "liter", "ml", "box", "pack", "dozen"].map(
+                (unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+
+          {/* Buying price */}
+          <div>
+            <label className="lbl" htmlFor="product-buying-price">
+              Buying price (KSh)
+            </label>
+
+            <input
+              id="product-buying-price"
+              name="buyingPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.buyingPrice}
+              onChange={handleChange}
+              placeholder="0.00"
+              className="input"
+            />
+          </div>
+
+          {/* Selling price */}
+          <div>
+            <label className="lbl" htmlFor="product-selling-price">
+              Selling price (KSh)
+            </label>
+
+            <input
+              id="product-selling-price"
+              name="sellingPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.sellingPrice}
+              onChange={handleChange}
+              placeholder="0.00"
+              className="input"
+            />
+          </div>
+
+          {/* Low stock threshold */}
+          <div>
+            <label className="lbl" htmlFor="product-low-stock">
+              Low-stock threshold
+            </label>
+
+            <input
+              id="product-low-stock"
+              name="lowStockThreshold"
+              type="number"
+              min="0"
+              step="1"
+              value={form.lowStockThreshold}
+              onChange={handleChange}
+              className="input"
+            />
+          </div>
+
+          {/* Image upload */}
+          <div className="sm:col-span-2">
+            <label className="lbl">
+              Product image
+              <span className="ml-1 font-normal text-slate-400">
+                (optional)
+              </span>
+            </label>
+
+            <div className="flex flex-col gap-4 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
                 {preview ? (
                   <img
                     src={preview}
-                    alt="Product preview"
-                    className="w-full h-full object-cover"
+                    alt="Selected product preview"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <ImagePlus size={24} className="text-slate-400" />
+                  <ImagePlus size={28} className="text-slate-400" />
                 )}
               </div>
+
               <div className="flex flex-col items-start gap-2">
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
-                  onChange={pickImage}
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageChange}
                   className="hidden"
-                  id="pm-img"
+                  id="product-image"
                 />
+
                 <label
-                  htmlFor="pm-img"
-                  className="cursor-pointer text-[13px] font-semibold text-[#1a56c4] hover:underline"
+                  htmlFor="product-image"
+                  className="cursor-pointer rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
                 >
-                  {preview ? "Change image" : "Upload image"}
+                  {preview ? "Change image" : "Choose image"}
                 </label>
+
                 {preview && (
                   <button
                     type="button"
-                    onClick={clearImage}
-                    className="inline-flex items-center gap-1 text-[13px] text-red-600 hover:underline"
+                    onClick={handleRemoveImage}
+                    className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700"
                   >
-                    <Trash2 size={13} /> Remove
+                    <Trash2 size={15} />
+                    Remove image
                   </button>
                 )}
-                <span className="text-[11.5px] text-slate-500">
-                  PNG or JPG, up to {MAX_MB}MB
-                </span>
+
+                <p className="text-xs text-slate-500">
+                  JPG, PNG or WEBP. Maximum size: 2MB.
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  Preview is local. The image uploads when catalogue sync runs.
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6">
+        {/* Footer */}
+        <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5">
           <button
             type="button"
             onClick={onClose}
-            className="h-11 px-5 rounded-[10px] border border-line text-[14px] font-medium hover:bg-slate-50"
+            disabled={saving}
+            className="h-11 rounded-lg border border-slate-300 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
             Cancel
           </button>
+
           <button
             type="submit"
             disabled={saving}
-            className="h-11 px-6 rounded-[10px] bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold inline-flex items-center gap-2 disabled:opacity-70"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-700 px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
-            {editing ? "Save changes" : "Add product"}
+
+            {saving ? "Saving..." : editing ? "Save changes" : "Add product"}
           </button>
         </div>
       </form>

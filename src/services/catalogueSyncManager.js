@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { getDeviceId } from "../db/device.js";
+import { uploadCatalogueImage } from "./catalogueImageService.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -71,6 +72,10 @@ const processResults = async (operations, results) => {
       });
 
       await updateLocalEntityAfterUpload(operation, result);
+
+      if (operation.entityType === "product") {
+        await db.catalogueImages.delete(["product", operation.entityId]);
+      }
     } else if (result.status === "conflict") {
       await db.catalogueSync.update(operation.id, {
         status: "conflict",
@@ -145,6 +150,7 @@ const applyDownloadedChanges = async (changes) => {
           stockQuantity: product.stockQuantity ?? 0,
           unit: product.unit,
           imageUrl: product.imageUrl || "",
+          imagePublicId: product.imagePublicId || "",
           isActive: product.isActive,
           version: product.version,
           syncStatus: "synced",
@@ -186,6 +192,53 @@ const sendCatalogueBatch = async (token, operations, cursor) => {
   return data;
 };
 
+const prepareCatalogueImages = async (operations, token) => {
+  const prepared = [];
+
+  for (const operation of operations) {
+    if (operation.entityType !== "product") {
+      prepared.push(operation);
+      continue;
+    }
+
+    const image = await db.catalogueImages.get(["product", operation.entityId]);
+
+    if (!image) {
+      prepared.push(operation);
+      continue;
+    }
+
+    let uploadedImage = image.uploadedImage;
+
+    if (!uploadedImage) {
+      uploadedImage = await uploadCatalogueImage(image.blob, token);
+
+      await db.catalogueImages.update(["product", operation.entityId], {
+        uploadedImage,
+        status: "uploaded",
+      });
+    }
+
+    const updatedPayload = {
+      ...operation.payload,
+      imageUrl: uploadedImage.imageUrl,
+      imagePublicId: uploadedImage.imagePublicId,
+    };
+
+    await db.catalogueSync.update(operation.id, {
+      payload: updatedPayload,
+      updatedAt: new Date().toISOString(),
+    });
+
+    prepared.push({
+      ...operation,
+      payload: updatedPayload,
+    });
+  }
+
+  return prepared;
+};
+
 const syncCatalogue = async (getToken) => {
   if (!navigator.onLine) {
     return {
@@ -215,12 +268,15 @@ const syncCatalogue = async (getToken) => {
   // Upload pending operations, then download all available pages.
   const operations = await getPendingOperations();
 
+  let preparedOperations = operations;
+
   let data;
 
   try {
-    data = await sendCatalogueBatch(token, operations, cursor);
+    preparedOperations = await prepareCatalogueImages(operations, token);
+
+    data = await sendCatalogueBatch(token, preparedOperations, cursor);
   } catch (error) {
-    // Network/server failure: preserve operation IDs and retry later.
     for (const operation of operations) {
       const attempts = (operation.attempts || 0) + 1;
       const delay = Math.min(1000 * 2 ** attempts, 300000);
@@ -235,7 +291,7 @@ const syncCatalogue = async (getToken) => {
     throw error;
   }
 
-  await processResults(operations, data.results || []);
+  await processResults(preparedOperations, data.results || []);
   await applyDownloadedChanges(data.changes || {});
 
   uploaded += (data.results || []).filter(
