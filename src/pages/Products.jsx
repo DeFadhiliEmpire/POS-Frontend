@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -50,7 +50,12 @@ function Thumb({ src, name }) {
 }
 
 const selectCls =
-  "h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-700 focus:outline-none focus:border-brand focus:ring-[3px] focus:ring-brand/20";
+  "h-11 rounded-sm border border-slate-200 bg-white px-3 text-[13px] text-slate-700 focus:outline-none focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+const card =
+  "bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(16,24,40,.04)]";
+
+const th = "text-left text-[11.5px] font-medium text-slate-500 px-3 py-2.5";
+const td = "px-3 py-2.5 text-[12.5px]";
 
 {
   /*
@@ -90,8 +95,7 @@ export default function Products() {
   const [confirm, setConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = useCallback(async () => {
     setError("");
 
     try {
@@ -102,16 +106,18 @@ export default function Products() {
 
       setItems(productsData || []);
       setCategories(categoriesData || []);
-    } catch (error) {
-      setError(error.message || "Failed to load products");
+    } catch (err) {
+      setError(err.message || "Failed to load products");
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Add dependencies here if getProducts/getCategories depend on props or state
 
+  // Run it on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts();
-  }, []);
+  }, [loadProducts]);
 
   const categoryMap = useMemo(
     () =>
@@ -199,7 +205,7 @@ export default function Products() {
         <button
           onClick={() => setModal({ product: null })}
           disabled={!categories.length}
-          className="h-11 px-5 rounded-xl bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm"
+          className="h-11 px-5 rounded-sm bg-[#16915f] hover:bg-[#16915f]-dark text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={18} /> Add Product
         </button>
@@ -228,7 +234,7 @@ export default function Products() {
             }}
             placeholder="Search products..."
             aria-label="Search products"
-            className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-[14px] focus:outline-none focus:border-brand focus:ring-[3px] focus:ring-brand/20"
+            className="w-full h-11 rounded-sm border border-slate-200 bg-white pl-11 pr-4 text-[14px] focus:outline-none focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20"
           />
         </div>
         <select
@@ -267,7 +273,7 @@ export default function Products() {
           onClick={loadProducts}
           disabled={loading}
           title="Refresh products"
-          className="h-11 w-11 grid place-items-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50"
+          className="h-11 w-11 grid place-items-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
         >
           {" "}
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
@@ -282,16 +288,22 @@ export default function Products() {
                 {[
                   "Image",
                   "Name",
+                  "SKU",
                   "Category",
                   "Price (KSh)",
                   "Stock",
                   "Status",
                 ].map((heading) => (
-                  <th key={heading} className="th px-5">
+                  <th
+                    key={heading}
+                    className="text-left text-[11.5px] font-medium text-slate-500 px-3 py-2.5 px-5"
+                  >
                     {heading}
                   </th>
                 ))}
-                <th className="th px-5 text-right">Actions</th>
+                <th className="text-left text-[11.5px] font-medium text-slate-500 px-3 py-2.5 px-5 text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody
@@ -304,33 +316,35 @@ export default function Products() {
                     key={product.productId}
                     className="h-[64px] hover:bg-slate-50/60"
                   >
-                    <td className="td px-5">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5">
                       <Thumb src={product.imageUrl} name={product.name} />
                     </td>
 
-                    <td className="td px-5 text-[13.5px] font-medium">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5 text-[13.5px] font-medium">
                       {product.name}
                     </td>
 
-                    <td className="td px-5 text-slate-500">{product.sku}</td>
+                    <td className="px-3 py-2.5 text-[12.5px] px-5 text-slate-500">
+                      {product.sku}
+                    </td>
 
-                    <td className="td px-5 text-slate-500">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5 text-slate-500">
                       {categoryMap.get(String(product.categoryId)) || "—"}
                     </td>
 
-                    <td className="td px-5">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5">
                       {Number(product.sellingPrice || 0).toLocaleString(
                         "en-KE",
                       )}
                     </td>
 
-                    <td className="td px-5">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5">
                       {Number(product.stockQuantity || 0).toLocaleString(
                         "en-KE",
                       )}
                     </td>
 
-                    <td className="td px-5">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5">
                       <span
                         className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium ${cls}`}
                       >
@@ -338,7 +352,7 @@ export default function Products() {
                       </span>
                     </td>
 
-                    <td className="td px-5">
+                    <td className="px-3 py-2.5 text-[12.5px] px-5">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => setModal({ product })}

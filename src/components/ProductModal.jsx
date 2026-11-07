@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { X, Loader2, ImagePlus, Trash2 } from "lucide-react";
 
 import Alert from "./Alert";
@@ -27,21 +27,27 @@ export default function ProductModal({
   });
 
   const [imageFile, setImageFile] = useState(null);
-  const [preview, setPreview] = useState(product?.imageUrl || "");
   const [removeImage, setRemoveImage] = useState(false);
 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const preview = useMemo(() => {
+    if (removeImage) return "";
+    if (imageFile) {
+      return URL.createObjectURL(imageFile);
+    }
+    return product?.imageUrl || "";
+  }, [imageFile, removeImage, product?.imageUrl]);
+
   // Create and clean up the temporary preview URL.
   useEffect(() => {
-    if (!imageFile) return;
-
-    const objectUrl = URL.createObjectURL(imageFile);
-    setPreview(objectUrl);
-
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageFile]);
+    return () => {
+      if (preview && preview.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   // Close modal using Escape.
   useEffect(() => {
@@ -84,7 +90,6 @@ export default function ProductModal({
 
   const handleRemoveImage = () => {
     setImageFile(null);
-    setPreview("");
     setRemoveImage(true);
 
     if (fileRef.current) {
@@ -177,6 +182,10 @@ export default function ProductModal({
     }
   };
 
+  const input =
+    "w-full h-12 rounded-[10px] border border-[#dfe5ec] bg-slate-50 px-3.5 text-[15px] text-ink placeholder:text-slate-400 transition focus:outline-none focus:bg-white focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20";
+  const lbl = "block text-[13px] font-semibold mb-1.5";
+
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4"
@@ -229,7 +238,7 @@ export default function ProductModal({
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Product name */}
           <div className="sm:col-span-2">
-            <label className="lbl" htmlFor="product-name">
+            <label className={lbl} htmlFor="product-name">
               Product name
             </label>
 
@@ -239,14 +248,16 @@ export default function ProductModal({
               value={form.name}
               onChange={handleChange}
               placeholder="e.g. Coca Cola 500ml"
-              className="input"
+              className="w-full h-12 rounded-[10px] border border-[#dfe5ec] bg-slate-50 px-3.5 text-[15px] text-ink
+           placeholder:text-slate-400 transition
+           focus:outline-none focus:bg-white focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20"
               required
             />
           </div>
 
           {/* SKU */}
           <div>
-            <label className="lbl" htmlFor="product-sku">
+            <label className={lbl} htmlFor="product-sku">
               SKU
             </label>
 
@@ -256,14 +267,16 @@ export default function ProductModal({
               value={form.sku}
               onChange={handleChange}
               placeholder="e.g. COKE-500"
-              className="input"
+              className="w-full h-12 rounded-[10px] border border-[#dfe5ec] bg-slate-50 px-3.5 text-[15px] text-ink
+           placeholder:text-slate-400 transition
+           focus:outline-none focus:bg-white focus:border-[#16915f] focus:ring-[3px] focus:ring-[#16915f]/20"
               required
             />
           </div>
 
           {/* Barcode */}
           <div>
-            <label className="lbl" htmlFor="product-barcode">
+            <label className={lbl} htmlFor="product-barcode">
               Barcode
             </label>
 
@@ -273,13 +286,13 @@ export default function ProductModal({
               value={form.barcode}
               onChange={handleChange}
               placeholder="Optional barcode"
-              className="input"
+              className={input}
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="lbl" htmlFor="product-category">
+            <label className={lbl} htmlFor="product-category">
               Category
             </label>
 
@@ -288,7 +301,7 @@ export default function ProductModal({
               name="categoryId"
               value={form.categoryId}
               onChange={handleChange}
-              className="input"
+              className={input}
               required
             >
               <option value="">Select category</option>
@@ -305,7 +318,7 @@ export default function ProductModal({
 
           {/* Unit */}
           <div>
-            <label className="lbl" htmlFor="product-unit">
+            <label className={lbl} htmlFor="product-unit">
               Unit
             </label>
 
@@ -314,7 +327,7 @@ export default function ProductModal({
               name="unit"
               value={form.unit}
               onChange={handleChange}
-              className="input"
+              className={input}
             >
               {["piece", "kg", "g", "liter", "ml", "box", "pack", "dozen"].map(
                 (unit) => (
@@ -328,7 +341,7 @@ export default function ProductModal({
 
           {/* Buying price */}
           <div>
-            <label className="lbl" htmlFor="product-buying-price">
+            <label className={lbl} htmlFor="product-buying-price">
               Buying price (KSh)
             </label>
 
@@ -341,13 +354,13 @@ export default function ProductModal({
               value={form.buyingPrice}
               onChange={handleChange}
               placeholder="0.00"
-              className="input"
+              className={input}
             />
           </div>
 
           {/* Selling price */}
           <div>
-            <label className="lbl" htmlFor="product-selling-price">
+            <label className={lbl} htmlFor="product-selling-price">
               Selling price (KSh)
             </label>
 
@@ -360,13 +373,13 @@ export default function ProductModal({
               value={form.sellingPrice}
               onChange={handleChange}
               placeholder="0.00"
-              className="input"
+              className={input}
             />
           </div>
 
           {/* Low stock threshold */}
           <div>
-            <label className="lbl" htmlFor="product-low-stock">
+            <label className={lbl} htmlFor="product-low-stock">
               Low-stock threshold
             </label>
 
@@ -378,13 +391,13 @@ export default function ProductModal({
               step="1"
               value={form.lowStockThreshold}
               onChange={handleChange}
-              className="input"
+              className={input}
             />
           </div>
 
           {/* Image upload */}
           <div className="sm:col-span-2">
-            <label className="lbl">
+            <label className={lbl}>
               Product image
               <span className="ml-1 font-normal text-slate-400">
                 (optional)
@@ -458,7 +471,7 @@ export default function ProductModal({
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-700 px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#16915f] px-6 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
 
