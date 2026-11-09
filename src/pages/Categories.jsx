@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import Alert from "../components/Alert";
 import CategoryModal from "../components/CategoryModal";
-import { listCategories, setCategoryActive } from "../services/categoryApi";
+{
+  /*import { listCategories, setCategoryActive } from "../services/categoryApi";*/
+}
 
 const fmtDate = (iso) =>
   new Date(iso).toLocaleDateString("en-GB", {

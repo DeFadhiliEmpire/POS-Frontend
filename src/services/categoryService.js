@@ -1,19 +1,23 @@
 import { db } from "../db/db.js";
-import { createObjectId, queueCatalogueOperation } from "./catalogueQueue.js";
+import { createCategoryId, queueCatalogueOperation } from "./catalogueQueue.js";
+
+const normalizeCategoryName = (name) =>
+  name.trim().normalize("NFKC").toLowerCase();
 
 const createCategory = async ({ name, description = "" }) => {
   if (!name?.trim()) {
     throw new Error("Category name is required");
   }
 
-  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
-    const normalizedName = name.trim().toLowerCase();
+  const cleanName = name.trim();
+  const cleanDescription = description.trim();
+  const normalizedName = normalizeCategoryName(cleanName);
 
+  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
     const duplicate = await db.categories
       .filter(
         (category) =>
-          category.name?.trim().toLowerCase() === normalizedName &&
-          category.isActive,
+          category.normalizedName === normalizedName && category.isActive,
       )
       .first();
 
@@ -21,15 +25,19 @@ const createCategory = async ({ name, description = "" }) => {
       throw new Error("A category with this name already exists");
     }
 
-    const categoryId = createObjectId();
+    const categoryId = createCategoryId();
+    const now = new Date().toISOString();
 
     const category = {
       categoryId,
-      name: name.trim(),
-      description,
+      name: cleanName,
+      normalizedName,
+      description: cleanDescription,
       isActive: true,
       version: 0,
       syncStatus: "pending",
+      createdAt: now,
+      updatedAt: now,
     };
 
     await db.categories.add(category);
@@ -40,8 +48,9 @@ const createCategory = async ({ name, description = "" }) => {
       action: "create",
       baseVersion: 0,
       payload: {
-        name: category.name,
-        description: category.description,
+        categoryUid: categoryId,
+        name: cleanName,
+        description: cleanDescription,
       },
     });
 
@@ -68,14 +77,16 @@ const updateCategory = async (categoryId, changes) => {
       throw new Error("Category name is required");
     }
 
-    const normalizedName = name.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanDescription = description.trim();
+    const normalizedName = normalizeCategoryName(cleanName);
 
     const duplicate = await db.categories
       .filter(
         (item) =>
           item.categoryId !== categoryId &&
           item.isActive &&
-          item.name?.trim().toLowerCase() === normalizedName,
+          item.normalizedName === normalizedName,
       )
       .first();
 
@@ -83,11 +94,15 @@ const updateCategory = async (categoryId, changes) => {
       throw new Error("Another category already uses this name");
     }
 
+    const now = new Date().toISOString();
+
     const updated = {
       ...category,
-      name: name.trim(),
-      description,
+      name: cleanName,
+      normalizedName,
+      description: cleanDescription,
       syncStatus: "pending",
+      updatedAt: now,
     };
 
     await db.categories.put(updated);
@@ -96,10 +111,10 @@ const updateCategory = async (categoryId, changes) => {
       entityType: "category",
       entityId: categoryId,
       action: "update",
-      baseVersion: category.version || 1,
+      baseVersion: category.version ?? 0,
       payload: {
-        name: updated.name,
-        description: updated.description,
+        name: cleanName,
+        description: cleanDescription,
       },
     });
 
@@ -136,17 +151,20 @@ const deactivateCategory = async (categoryId) => {
         );
       }
 
+      const now = new Date().toISOString();
+
       await db.categories.update(categoryId, {
         isActive: false,
         syncStatus: "pending",
+        updatedAt: now,
       });
 
       await queueCatalogueOperation({
         entityType: "category",
         entityId: categoryId,
-        action: "deactivate",
-        baseVersion: category.version || 1,
-        payload: {},
+        action: "status",
+        baseVersion: category.version ?? 0,
+        payload: { isActive: false },
       });
 
       return { success: true };
@@ -155,7 +173,9 @@ const deactivateCategory = async (categoryId) => {
 };
 
 const getCategories = async () => {
-  return db.categories.filter((category) => category.isActive).toArray();
+  return db.categories
+    .filter((category) => category.isActive === true)
+    .toArray();
 };
 
 const getCategoryById = async (categoryId) => {

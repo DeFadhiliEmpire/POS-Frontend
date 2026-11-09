@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import Alert from "./Alert";
-import { createCategory, updateCategory } from "../categoriesApi";
+{
+  /*import { createCategory, updateCategory } from "../categoriesApi";*/
+}
 
 const MAX_DESC = 200;
 

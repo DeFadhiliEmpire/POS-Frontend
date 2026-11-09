@@ -1,12 +1,6 @@
 import { db } from "../db/db.js";
 
-const createObjectId = () => {
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-
-  return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
+const createCategoryId = () => crypto.randomUUID();
 
 const createOperationId = () => crypto.randomUUID();
 
@@ -20,61 +14,52 @@ const queueCatalogueOperation = async ({
   const existing = await db.catalogueSync
     .where("[entityType+entityId]")
     .equals([entityType, entityId])
-    .filter((operation) => operation.status === "pending")
     .first();
 
-  // Coalesce multiple unsynced edits into one operation.
+  if (existing?.status === "syncing") {
+    throw new Error("This item is currently synchronizing. Try again shortly.");
+  }
+
+  if (existing?.status === "conflict") {
+    throw new Error(
+      "This item has a synchronization conflict. Resolve it before editing.",
+    );
+  }
+
+  // A locally created category has not reached the server yet.
+  // If it is deactivated before synchronization, cancel its create operation.
+  if (
+    existing?.status === "pending" &&
+    existing.action === "create" &&
+    action === "status" &&
+    payload?.isActive === false
+  ) {
+    await db.catalogueSync.delete(existing.id);
+    return existing.operationId;
+  }
 
   if (existing) {
-    // Entity was created locally but never sent to the server.
-    if (existing.action === "create" && action === "deactivate") {
-      await db.catalogueSync.delete(existing.id);
-      return existing.operationId;
-    }
-
-    if (existing.action === "create") {
-      await db.catalogueSync.update(existing.id, {
-        payload: {
-          ...existing.payload,
-          ...payload,
-        },
-        updatedAt: new Date().toISOString(),
-      });
-
-      return existing.operationId;
-    }
-
-    if (action === "deactivate") {
-      await db.catalogueSync.update(existing.id, {
-        action: "deactivate",
-        payload: {},
-        updatedAt: new Date().toISOString(),
-      });
-
-      return existing.operationId;
-    }
+    const isPendingCreate = existing.action === "create";
 
     await db.catalogueSync.update(existing.id, {
-      payload: {
-        ...existing.payload,
-        ...payload,
-      },
+      operationId:
+        existing.status === "pending"
+          ? existing.operationId
+          : createOperationId(),
+
+      action: isPendingCreate ? "create" : action,
+
+      baseVersion:
+        existing.status === "pending" ? existing.baseVersion : baseVersion,
+
+      payload: isPendingCreate ? { ...existing.payload, ...payload } : payload,
+
+      status: "pending",
+      error: null,
       updatedAt: new Date().toISOString(),
     });
 
     return existing.operationId;
-  }
-
-  const conflicted = await db.catalogueSync
-    .where("[entityType+entityId]")
-    .equals([entityType, entityId])
-    .filter((operation) => operation.status === "conflict")
-    .first();
-
-  if (conflicted) {
-    throw new Error(
-      "This item has a synchronization conflict. Resolve it before editing again.",
-    );
   }
 
   const operationId = createOperationId();
@@ -95,4 +80,4 @@ const queueCatalogueOperation = async ({
   return operationId;
 };
 
-export { createObjectId, queueCatalogueOperation };
+export { createCategoryId, createOperationId, queueCatalogueOperation };
