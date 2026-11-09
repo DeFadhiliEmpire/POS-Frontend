@@ -422,7 +422,12 @@ const bootstrapCatalogue = async (token) => {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || "Catalogue bootstrap failed");
+    console.error("Catalogue bootstrap failed:", {
+      status: res.status,
+      response: data,
+    });
+
+    throw new Error(data.message || "Failed to download catalogue");
   }
 
   await applyDownloadedChanges({

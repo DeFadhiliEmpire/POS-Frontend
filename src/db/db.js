@@ -46,6 +46,10 @@ db.version(4).stores({
   catalogueImages: "[entityType+entityId],entityType,entityId,status,createdAt",
 });
 
+db.version(5).stores({
+  categories: "categoryId,name,normalizedName,isActive,syncStatus,version",
+});
+
 const getNextCounter = async (key) => {
   let counter = await db.counters.where("key").equals(key).first();
   if (!counter) {

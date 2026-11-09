@@ -14,6 +14,9 @@ import ProductModal from "../components/ProductModal";
 import Alert from "../components/Alert";
 import { getProducts, deactivateProduct } from "../services/productService";
 import { getCategories } from "../services/categoryService";
+import { startAutomaticCatalogueSync } from "../services/catalogueSyncManager";
+import { useContext } from "react";
+import { AuthContext } from "../AuthContext";
 
 const PAGE_SIZE = 6;
 
@@ -94,6 +97,16 @@ export default function Products() {
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const { getToken } = useContext(AuthContext);
+
+  useEffect(() => {
+    const stopSync = startAutomaticCatalogueSync(getToken, (result) => {
+      console.log("Catalogue sync result:", result);
+    });
+
+    return stopSync;
+  }, [getToken]);
 
   const loadProducts = useCallback(async () => {
     setError("");
