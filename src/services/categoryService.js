@@ -182,6 +182,115 @@ const getCategoryById = async (categoryId) => {
   return db.categories.get(categoryId);
 };
 
+export async function listCategories() {
+  const [categories, products] = await Promise.all([
+    db.categories.toArray(),
+    db.products.toArray(),
+  ]);
+
+  const productCounts = new Map();
+
+  for (const product of products) {
+    if (!product.categoryId) continue;
+
+    const count = productCounts.get(product.categoryId) || 0;
+    productCounts.set(product.categoryId, count + 1);
+  }
+
+  const items = categories
+    .map((category) => ({
+      ...category,
+      productCount: productCounts.get(category.categoryId) || 0,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { items };
+}
+
+export async function setCategoryActive(categoryId, isActive) {
+  if (!categoryId) {
+    throw new Error("Category ID is required.");
+  }
+
+  if (typeof isActive !== "boolean") {
+    throw new Error("Category status must be a boolean.");
+  }
+
+  const now = new Date().toISOString();
+
+  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
+    const category = await db.categories.get(categoryId);
+
+    if (!category) {
+      throw new Error("Category not found.");
+    }
+
+    // Nothing to change.
+    if (category.isActive === isActive) {
+      return category;
+    }
+
+    const updatedCategory = {
+      ...category,
+      isActive,
+      syncStatus: "pending",
+      updatedAt: now,
+    };
+
+    // Save immediately in IndexedDB.
+    await db.categories.put(updatedCategory);
+
+    // Find an existing pending operation for this category.
+    const existingOperation = await db.catalogueSync.get([
+      "category",
+      categoryId,
+    ]);
+
+    let action = existingOperation?.action || "status";
+
+    // Preserve an unsynchronized creation operation.
+    if (action === "create") {
+      action = "create";
+    }
+
+    // Preserve a pending update operation.
+    if (action === "update") {
+      action = "update";
+    }
+
+    const payload =
+      action === "create"
+        ? {
+            ...(existingOperation?.payload || {}),
+            ...updatedCategory,
+          }
+        : action === "update"
+          ? {
+              ...(existingOperation?.payload || {}),
+              isActive,
+            }
+          : { isActive };
+
+    await db.catalogueSync.put({
+      operationId: existingOperation?.operationId || crypto.randomUUID(),
+
+      entityType: "category",
+      entityId: categoryId,
+      action,
+
+      baseVersion: existingOperation?.baseVersion ?? category.version ?? 0,
+
+      payload,
+      status: "pending",
+
+      createdAt: existingOperation?.createdAt || now,
+      updatedAt: now,
+    });
+
+    return updatedCategory;
+  });
+}
+
 export {
   createCategory,
   updateCategory,

@@ -11,9 +11,7 @@ import {
 } from "lucide-react";
 import Alert from "../components/Alert";
 import CategoryModal from "../components/CategoryModal";
-{
-  /*import { listCategories, setCategoryActive } from "../services/categoryApi";*/
-}
+import { listCategories, setCategoryActive } from "../services/categoryService";
 
 const fmtDate = (iso) =>
   new Date(iso).toLocaleDateString("en-GB", {
@@ -24,7 +22,7 @@ const fmtDate = (iso) =>
 
 function Stat({ icon: Icon, label, value, tone }) {
   return (
-    <div className="card p-4 flex items-center gap-4">
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_2px_rgba(16,24,40,.04)] p-4 flex items-center gap-4">
       <span className={`w-12 h-12 rounded-xl grid place-items-center ${tone}`}>
         <Icon size={22} />
       </span>
@@ -48,7 +46,7 @@ export default function Categories() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+
     listCategories()
       .then((r) => {
         if (!cancelled) {
@@ -68,7 +66,7 @@ export default function Categories() {
   }, [refresh]);
 
   const stats = useMemo(() => {
-    const active = items.filter((c) => c.active).length;
+    const active = items.filter((c) => c.isActive).length;
     return { total: items.length, active, inactive: items.length - active };
   }, [items]);
 
@@ -79,10 +77,10 @@ export default function Categories() {
   }
 
   async function toggle(c, active) {
-    setBusyId(c.id);
+    setBusyId(c.categoryId);
     setError("");
     try {
-      await setCategoryActive(c.id, active);
+      await setCategoryActive(c.categoryId, active);
       setNotice(`“${c.name}” ${active ? "activated" : "deactivated"}.`);
       setRefresh((n) => n + 1);
     } catch (e) {
@@ -107,7 +105,7 @@ export default function Categories() {
             setNotice("");
             setModal({ category: null });
           }}
-          className="h-11 px-5 rounded-xl bg-brand hover:bg-brand-dark text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm"
+          className="h-11 px-5 rounded-sm bg-[#16915f] hover:bg-[#16915f]/80 text-white text-[14px] font-semibold inline-flex items-center gap-2 shadow-sm cursor-pointer"
         >
           <Plus size={18} /> Add Category
         </button>
@@ -137,7 +135,7 @@ export default function Categories() {
       <Alert type="success">{notice}</Alert>
       <Alert>{error}</Alert>
 
-      <div className="card overflow-hidden">
+      <div className="bg-white rounded-sm border border-slate-200/70 shadow-[0_1px_2px_rgba(16,24,40,.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px]">
             <thead className="bg-slate-50 border-b border-slate-100">
@@ -149,11 +147,16 @@ export default function Categories() {
                   "Status",
                   "Created",
                 ].map((h) => (
-                  <th key={h} className="th px-5">
+                  <th
+                    key={h}
+                    className="text-left text-[11.5px] font-medium text-slate-500 px-3 py-2.5 px-5"
+                  >
                     {h}
                   </th>
                 ))}
-                <th className="th px-5 text-right">Actions</th>
+                <th className="text-left text-[11.5px] font-medium text-slate-500 px-3 py-2.5 px-5 text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody
@@ -161,8 +164,8 @@ export default function Categories() {
             >
               {items.map((c) => (
                 <tr
-                  key={c.id}
-                  className={`h-[60px] hover:bg-slate-50/60 ${c.active ? "" : "text-slate-400"}`}
+                  key={c.categoryId}
+                  className={`h-[60px] hover:bg-slate-50/60 ${c.isActive ? "" : "text-slate-400"}`}
                 >
                   <td className="td px-5 text-[13.5px] font-medium">
                     {c.name}
@@ -176,9 +179,9 @@ export default function Categories() {
                   <td className="td px-5">{c.productCount}</td>
                   <td className="td px-5">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium ${c.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                      className={`px-2.5 py-1 rounded-md text-[11.5px] font-medium ${c.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
                     >
-                      {c.active ? "Active" : "Inactive"}
+                      {c.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="td px-5">{fmtDate(c.createdAt)}</td>
@@ -193,10 +196,10 @@ export default function Categories() {
                       >
                         <Pencil size={14} /> Edit
                       </button>
-                      {c.active ? (
+                      {c.isActive ? (
                         <button
                           onClick={() => setConfirm(c)}
-                          disabled={busyId === c.id}
+                          disabled={busyId === c.categoryId}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
                         >
                           <PowerOff size={14} /> Deactivate
@@ -204,10 +207,10 @@ export default function Categories() {
                       ) : (
                         <button
                           onClick={() => toggle(c, true)}
-                          disabled={busyId === c.id}
+                          disabled={busyId === c.categoryId}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                         >
-                          {busyId === c.id ? (
+                          {busyId === c.categoryId ? (
                             <Loader2 size={14} className="animate-spin" />
                           ) : (
                             <Power size={14} />
@@ -229,7 +232,10 @@ export default function Categories() {
               {!loading && !items.length && !error && (
                 <tr>
                   <td colSpan="6" className="py-14 text-center text-slate-500">
-                    <Tags size={30} className="mx-auto mb-2 text-slate-300" />
+                    <Tags
+                      size={30}
+                      className="mx-auto mb-2 text-slate-300 text-sm"
+                    />
                     No categories yet. Click “Add Category” to create your first
                     one.
                   </td>
@@ -275,10 +281,10 @@ export default function Categories() {
               </button>
               <button
                 onClick={() => toggle(confirm, false)}
-                disabled={busyId === confirm.id}
+                disabled={busyId === confirm.categoryId}
                 className="h-10 px-5 rounded-[10px] bg-red-600 hover:bg-red-700 text-white text-[14px] font-semibold inline-flex items-center gap-2 disabled:opacity-70"
               >
-                {busyId === confirm.id && (
+                {busyId === confirm.categoryId && (
                   <Loader2 size={15} className="animate-spin" />
                 )}{" "}
                 Deactivate

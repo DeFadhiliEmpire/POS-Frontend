@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 
 const createCategoryId = () => crypto.randomUUID();
+const createObjectId = () => crypto.randomUUID();
 
 const createOperationId = () => crypto.randomUUID();
 
@@ -80,4 +81,9 @@ const queueCatalogueOperation = async ({
   return operationId;
 };
 
-export { createCategoryId, createOperationId, queueCatalogueOperation };
+export {
+  createCategoryId,
+  createObjectId,
+  createOperationId,
+  queueCatalogueOperation,
+};
