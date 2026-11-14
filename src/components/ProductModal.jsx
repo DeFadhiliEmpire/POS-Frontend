@@ -201,7 +201,7 @@ export default function ProductModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-modal-title"
-        className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-sm bg-white p-6 shadow-2xl"
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">

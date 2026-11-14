@@ -1,9 +1,8 @@
 import { db } from "../db/db.js";
-
-window.db = db;
-
 import { createObjectId, queueCatalogueOperation } from "./catalogueQueue.js";
 import { saveCatalogueImageLocally } from "./catalogueImageService.js";
+
+window.db = db;
 
 const validateProduct = (product) => {
   if (!product.name?.trim()) {
@@ -36,11 +35,21 @@ const validateProduct = (product) => {
   }
 };
 
+/*
+ * Request catalogue synchronization after a successful
+ * local transaction.
+ */
+const requestCatalogueSync = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("catalogue:sync-requested"));
+  }
+};
+
 const createProduct = async (input) => {
   const { imageFile } = input;
   validateProduct(input);
 
-  return db.transaction(
+  const product = await db.transaction(
     "rw",
     db.products,
     db.categories,
@@ -71,7 +80,7 @@ const createProduct = async (input) => {
         });
       }
 
-      const product = {
+      const newProduct = {
         productId,
         name: input.name.trim(),
         sku,
@@ -89,7 +98,7 @@ const createProduct = async (input) => {
         syncStatus: "pending",
       };
 
-      await db.products.add(product);
+      await db.products.add(newProduct);
 
       await queueCatalogueOperation({
         entityType: "product",
@@ -110,9 +119,14 @@ const createProduct = async (input) => {
         },
       });
 
-      return product;
+      return newProduct;
     },
   );
+
+  //Dispatch only after the transaction has committed
+  requestCatalogueSync();
+
+  return product;
 };
 
 const updateProduct = async (productId, changes) => {
