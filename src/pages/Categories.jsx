@@ -13,8 +13,8 @@ import Alert from "../components/Alert";
 import CategoryModal from "../components/CategoryModal";
 import {
   listCategories,
-  setCategoryActive,
   deactivateCategory,
+  activateCategory,
 } from "../services/categoryService";
 import { act } from "react";
 
@@ -100,7 +100,7 @@ export default function Categories() {
     setBusyId(c.categoryId);
     setError("");
     try {
-      await setCategoryActive(c.categoryId, active);
+      await activateCategory(c.categoryId);
       setNotice(`“${c.name}” ${active ? "activated" : "deactivated"}.`);
       setRefresh((n) => n + 1);
     } catch (e) {

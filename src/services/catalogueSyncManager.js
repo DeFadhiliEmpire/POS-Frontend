@@ -475,6 +475,14 @@ const applyDownloadedChanges = async (changes = {}) => {
 const sendCatalogueBatch = async (token, operations, cursor) => {
   const deviceId = await getDeviceId();
 
+  console.log("SENDING CATALOGUE OPERATION:", {
+    entityType: operations.entityType,
+    entityId: operations.entityId,
+    action: operations.action,
+    baseVersion: operations.baseVersion,
+    payload: operations.payload,
+  });
+
   const res = await fetch(`${API_URL}/sync/catalogue`, {
     method: "POST",
 

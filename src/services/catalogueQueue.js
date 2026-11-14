@@ -29,37 +29,46 @@ const queueCatalogueOperation = async ({
     );
   }
 
-  // A locally created category has not reached the server yet.
-  // If it is deactivated before synchronization, cancel its create operation.
-  if (
-    existing?.status === "pending" &&
-    existing.action === "create" &&
-    action === "status" &&
-    payload?.isActive === false
-  ) {
+  const isPending = existing?.status === "pending";
+  const isPendingCreate = isPending && existing.action === "create";
+
+  // A pending create can be cancelled if the item is deactivated
+  // before it has ever reached the server.
+  if (isPendingCreate && action === "deactivate") {
     await db.catalogueSync.delete(existing.id);
-    return existing.operationId;
+    return null;
   }
 
   if (existing) {
-    const isPending = existing.status === "pending";
-    const isPendingCreate = isPending && existing.action === "create";
-
     const operationId = isPending ? existing.operationId : createOperationId();
 
+    // Preserve the original create operation.
+    if (isPendingCreate) {
+      await db.catalogueSync.update(existing.id, {
+        operationId,
+        action: "create",
+        baseVersion: 0,
+        payload: {
+          ...existing.payload,
+          ...payload,
+        },
+        status: "pending",
+        attempts: 0,
+        nextRetryAt: null,
+        lastError: null,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return operationId;
+    }
+
+    // For ordinary pending operations, keep the original baseVersion
+    // but replace the payload with the latest intended state.
     await db.catalogueSync.update(existing.id, {
       operationId,
-
-      action: isPendingCreate ? "create" : action,
-
+      action,
       baseVersion: isPending ? existing.baseVersion : baseVersion,
-
-      payload: isPendingCreate
-        ? { ...existing.payload, ...payload }
-        : isPending
-          ? { ...existing.payload, ...payload }
-          : payload,
-
+      payload,
       status: "pending",
       attempts: 0,
       nextRetryAt: null,
