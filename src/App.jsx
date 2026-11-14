@@ -12,17 +12,22 @@ import TestProducts from "./TestProducts";
 import TestOfflineSale from "./TestOfflineSale";
 import TestOnlineSaleSync from "./TestOnlineSaleSync";
 import AutoSaleSync from "./AutoSaleSync";
+import { useContext } from "react";
+import { AuthContext } from "./AuthContext";
 
 function App() {
-  {
-    /*useEffect(() => {
+  const { accessToken, getToken } = useContext(AuthContext);
+
+  useEffect(() => {
+    // Do not start catalogue synchronization when logged out.
+    if (!accessToken) return;
+
     const stopCatalogueSync = startAutomaticCatalogueSync(getToken);
 
     return () => {
       stopCatalogueSync();
     };
-  }, []);*/
-  }
+  }, [accessToken, getToken]);
 
   return (
     <BrowserRouter>

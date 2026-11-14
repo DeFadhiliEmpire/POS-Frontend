@@ -1,5 +1,7 @@
 import { db } from "../db/db.js";
 
+window.db = db;
+
 import { createObjectId, queueCatalogueOperation } from "./catalogueQueue.js";
 import { saveCatalogueImageLocally } from "./catalogueImageService.js";
 

@@ -3,6 +3,8 @@ import { fetchCategories } from "./categoryApi.js";
 import { saveProducts } from "./productService";
 import { db } from "../db/db.js";
 
+window.db = db;
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const syncProducts = async (token) => {

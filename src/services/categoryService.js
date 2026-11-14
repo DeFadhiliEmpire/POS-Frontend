@@ -1,8 +1,20 @@
 import { db } from "../db/db.js";
 import { createCategoryId, queueCatalogueOperation } from "./catalogueQueue.js";
 
+window.db = db;
+
 const normalizeCategoryName = (name) =>
   name.trim().normalize("NFKC").toLowerCase();
+
+/*
+ * Request catalogue synchronization after a successful
+ * local transaction.
+ */
+const requestCatalogueSync = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("catalogue:sync-requested"));
+  }
+};
 
 const createCategory = async ({ name, description = "" }) => {
   if (!name?.trim()) {
@@ -13,117 +25,155 @@ const createCategory = async ({ name, description = "" }) => {
   const cleanDescription = description.trim();
   const normalizedName = normalizeCategoryName(cleanName);
 
-  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
-    const duplicate = await db.categories
-      .filter(
-        (category) =>
-          category.normalizedName === normalizedName && category.isActive,
-      )
-      .first();
+  const category = await db.transaction(
+    "rw",
+    db.categories,
+    db.catalogueSync,
+    async () => {
+      const duplicate = await db.categories
+        .filter((category) => category.normalizedName === normalizedName)
+        .first();
 
-    if (duplicate) {
-      throw new Error("A category with this name already exists");
-    }
+      if (duplicate) {
+        throw new Error("A category with this name already exists");
+      }
 
-    const categoryId = createCategoryId();
-    const now = new Date().toISOString();
+      const categoryUid = createCategoryId();
+      const now = new Date().toISOString();
 
-    const category = {
-      categoryId,
-      name: cleanName,
-      normalizedName,
-      description: cleanDescription,
-      isActive: true,
-      version: 0,
-      syncStatus: "pending",
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await db.categories.add(category);
-
-    await queueCatalogueOperation({
-      entityType: "category",
-      entityId: categoryId,
-      action: "create",
-      baseVersion: 0,
-      payload: {
-        categoryUid: categoryId,
+      const newCategory = {
+        categoryId: categoryUid,
+        categoryUid,
+        serverId: null,
         name: cleanName,
+        normalizedName,
         description: cleanDescription,
-      },
-    });
+        isActive: true,
+        version: 0,
+        syncStatus: "pending",
+        lastSyncedAt: null,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    return category;
-  });
+      await db.categories.add(newCategory);
+
+      await queueCatalogueOperation({
+        entityType: "category",
+        entityId: categoryUid,
+        action: "create",
+        baseVersion: 0,
+        payload: {
+          categoryUid,
+          name: cleanName,
+          description: cleanDescription,
+        },
+      });
+
+      return newCategory;
+    },
+  );
+
+  //Dispatch only after the transaction has committed
+  requestCatalogueSync();
+
+  return category;
 };
 
 const updateCategory = async (categoryId, changes) => {
-  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
-    const category = await db.categories.get(categoryId);
+  const updated = await db.transaction(
+    "rw",
+    db.categories,
+    db.catalogueSync,
+    async () => {
+      const category = await db.categories.get(categoryId);
 
-    if (!category || !category.isActive) {
-      throw new Error("Category not found or inactive");
-    }
+      if (!category || !category.isActive) {
+        throw new Error("Category not found or inactive");
+      }
 
-    if (category.syncStatus === "conflict") {
-      throw new Error("Resolve this category's sync conflict first");
-    }
+      if (category.syncStatus === "conflict") {
+        throw new Error("Resolve this category's sync conflict first");
+      }
 
-    const name = changes.name ?? category.name;
-    const description = changes.description ?? category.description;
+      const existingOperation = await db.catalogueSync
+        .where("[entityType+entityId]")
+        .equals(["category", categoryId])
+        .first();
 
-    if (!name?.trim()) {
-      throw new Error("Category name is required");
-    }
+      const hasPendingCreate =
+        existingOperation?.status === "pending" &&
+        existingOperation.action === "create";
 
-    const cleanName = name.trim();
-    const cleanDescription = description.trim();
-    const normalizedName = normalizeCategoryName(cleanName);
+      if ((category.version ?? 0) < 1 && !hasPendingCreate) {
+        throw new Error(
+          "This category has not synchronized yet. Try again after its creation syncs.",
+        );
+      }
 
-    const duplicate = await db.categories
-      .filter(
-        (item) =>
-          item.categoryId !== categoryId &&
-          item.isActive &&
-          item.normalizedName === normalizedName,
-      )
-      .first();
+      const name = changes.name ?? category.name;
+      const description = changes.description ?? category.description;
 
-    if (duplicate) {
-      throw new Error("Another category already uses this name");
-    }
+      if (!name?.trim()) {
+        throw new Error("Category name is required");
+      }
 
-    const now = new Date().toISOString();
+      const cleanName = name.trim();
+      const cleanDescription = description.trim();
+      const normalizedName = normalizeCategoryName(cleanName);
 
-    const updated = {
-      ...category,
-      name: cleanName,
-      normalizedName,
-      description: cleanDescription,
-      syncStatus: "pending",
-      updatedAt: now,
-    };
+      const duplicate = await db.categories
+        .filter(
+          (item) =>
+            item.categoryId !== categoryId &&
+            item.normalizedName === normalizedName,
+        )
+        .first();
 
-    await db.categories.put(updated);
+      if (duplicate) {
+        throw new Error("Another category already uses this name");
+      }
 
-    await queueCatalogueOperation({
-      entityType: "category",
-      entityId: categoryId,
-      action: "update",
-      baseVersion: category.version ?? 0,
-      payload: {
+      const now = new Date().toISOString();
+
+      const updatedCategory = {
+        ...category,
+        categoryId,
+        categoryUid: category.categoryUid || categoryId,
         name: cleanName,
+        normalizedName,
         description: cleanDescription,
-      },
-    });
+        syncStatus: "pending",
+        lastError: null,
+        updatedAt: now,
+      };
 
-    return updated;
-  });
+      await db.categories.put(updatedCategory);
+
+      await queueCatalogueOperation({
+        entityType: "category",
+        entityId: categoryId,
+        action: "update",
+        baseVersion: category.version ?? 0,
+        payload: {
+          name: cleanName,
+          description: cleanDescription,
+        },
+      });
+
+      return updatedCategory;
+    },
+  );
+
+  requestCatalogueSync();
+
+  return updated;
 };
 
-const deactivateCategory = async (categoryId) => {
-  return db.transaction(
+{
+  /*const deactivateCategory = async (categoryId) => {
+  const result = await db.transaction(
     "rw",
     db.categories,
     db.products,
@@ -137,6 +187,21 @@ const deactivateCategory = async (categoryId) => {
 
       if (category.syncStatus === "conflict") {
         throw new Error("Resolve this category's sync conflict first");
+      }
+
+      const existingOperation = await db.catalogueSync
+        .where("[entityType+entityId]")
+        .equals(["category", categoryId])
+        .first();
+
+      const hasPendingCreate =
+        existingOperation?.status === "pending" &&
+        existingOperation.action === "create";
+
+      if ((category.version ?? 0) < 1 && !hasPendingCreate) {
+        throw new Error(
+          "This category has not synchronized yet. Try again after its creation syncs.",
+        );
       }
 
       const dependentProducts = await db.products
@@ -156,21 +221,32 @@ const deactivateCategory = async (categoryId) => {
       await db.categories.update(categoryId, {
         isActive: false,
         syncStatus: "pending",
+        lastError: null,
         updatedAt: now,
       });
 
       await queueCatalogueOperation({
         entityType: "category",
         entityId: categoryId,
-        action: "status",
+        action: "deactivate",
         baseVersion: category.version ?? 0,
-        payload: { isActive: false },
+        payload: {
+          isActive: false,
+        },
       });
 
-      return { success: true };
+      return {
+        success: true,
+        categoryId,
+      };
     },
   );
-};
+
+  requestCatalogueSync();
+
+  return result;
+};*/
+}
 
 const getCategories = async () => {
   return db.categories
@@ -218,83 +294,106 @@ export async function setCategoryActive(categoryId, isActive) {
 
   const now = new Date().toISOString();
 
-  return db.transaction("rw", db.categories, db.catalogueSync, async () => {
-    const category = await db.categories.get(categoryId);
+  const updatedCategory = await db.transaction(
+    "rw",
+    db.categories,
+    db.products,
+    db.catalogueSync,
+    async () => {
+      const category = await db.categories.get(categoryId);
 
-    if (!category) {
-      throw new Error("Category not found.");
-    }
+      if (!category) {
+        throw new Error("Category not found.");
+      }
 
-    // Nothing to change.
-    if (category.isActive === isActive) {
-      return category;
-    }
+      if (category.isActive === isActive) {
+        return category;
+      }
 
-    const updatedCategory = {
-      ...category,
-      isActive,
-      syncStatus: "pending",
-      updatedAt: now,
-    };
+      if (category.syncStatus === "conflict") {
+        throw new Error("Resolve this category's sync conflict first.");
+      }
 
-    // Save immediately in IndexedDB.
-    await db.categories.put(updatedCategory);
+      const existingOperation = await db.catalogueSync
+        .where("[entityType+entityId]")
+        .equals(["category", categoryId])
+        .first();
 
-    // Find an existing pending operation for this category.
-    const existingOperation = await db.catalogueSync.get([
-      "category",
-      categoryId,
-    ]);
+      const hasPendingCreate =
+        existingOperation?.status === "pending" &&
+        existingOperation.action === "create";
 
-    let action = existingOperation?.action || "status";
+      if ((category.version ?? 0) < 1 && !hasPendingCreate) {
+        throw new Error(
+          "This category has not synchronized yet. Try again after its creation syncs.",
+        );
+      }
 
-    // Preserve an unsynchronized creation operation.
-    if (action === "create") {
-      action = "create";
-    }
+      // Do not deactivate a category that still has active products.
+      if (!isActive) {
+        const dependentProducts = await db.products
+          .where("categoryId")
+          .equals(categoryId)
+          .filter((product) => product.isActive)
+          .count();
 
-    // Preserve a pending update operation.
-    if (action === "update") {
-      action = "update";
-    }
+        if (dependentProducts > 0) {
+          throw new Error(
+            "Move active products to another category before deactivating this category.",
+          );
+        }
+      }
 
-    const payload =
-      action === "create"
-        ? {
-            ...(existingOperation?.payload || {}),
-            ...updatedCategory,
-          }
-        : action === "update"
-          ? {
-              ...(existingOperation?.payload || {}),
-              isActive,
-            }
-          : { isActive };
+      const updated = {
+        ...category,
+        isActive,
+        syncStatus: "pending",
+        lastError: null,
+        updatedAt: now,
+      };
 
-    await db.catalogueSync.put({
-      operationId: existingOperation?.operationId || crypto.randomUUID(),
+      await db.categories.put(updated);
 
-      entityType: "category",
-      entityId: categoryId,
-      action,
+      // Preserve an unsynchronized creation.
+      const action = hasPendingCreate
+        ? "create"
+        : isActive
+          ? "activate"
+          : "deactivate";
 
-      baseVersion: existingOperation?.baseVersion ?? category.version ?? 0,
+      await queueCatalogueOperation({
+        entityType: "category",
+        entityId: categoryId,
+        action,
+        baseVersion: hasPendingCreate ? 0 : category.version,
+        payload:
+          action === "create"
+            ? {
+                ...(existingOperation.payload || {}),
+                name: updated.name,
+                description: updated.description,
+              }
+            : { isActive },
+      });
 
-      payload,
-      status: "pending",
+      return updated;
+    },
+  );
 
-      createdAt: existingOperation?.createdAt || now,
-      updatedAt: now,
-    });
+  requestCatalogueSync();
 
-    return updatedCategory;
-  });
+  return updatedCategory;
 }
+
+const deactivateCategory = (categoryId) => setCategoryActive(categoryId, false);
+
+const activateCategory = (categoryId) => setCategoryActive(categoryId, true);
 
 export {
   createCategory,
   updateCategory,
   deactivateCategory,
+  activateCategory,
   getCategories,
   getCategoryById,
 };

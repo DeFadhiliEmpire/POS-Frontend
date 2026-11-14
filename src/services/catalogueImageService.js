@@ -1,5 +1,7 @@
 import { db } from "../db/db.js";
 
+window.db = db;
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;

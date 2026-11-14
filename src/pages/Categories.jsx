@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import Alert from "../components/Alert";
 import CategoryModal from "../components/CategoryModal";
-import { listCategories, setCategoryActive } from "../services/categoryService";
+import {
+  listCategories,
+  setCategoryActive,
+  deactivateCategory,
+} from "../services/categoryService";
+import { act } from "react";
 
 const fmtDate = (iso) =>
   new Date(iso).toLocaleDateString("en-GB", {
@@ -77,6 +82,21 @@ export default function Categories() {
   }
 
   async function toggle(c, active) {
+    setBusyId(c.categoryId);
+    setError("");
+    try {
+      await deactivateCategory(c.categoryId);
+      setNotice(`“${c.name}” ${active ? "activated" : "deactivated"}.`);
+      setRefresh((n) => n + 1);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+      setConfirm(null);
+    }
+  }
+
+  async function activate(c, active) {
     setBusyId(c.categoryId);
     setError("");
     try {
@@ -206,7 +226,7 @@ export default function Categories() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => toggle(c, true)}
+                          onClick={() => activate(c, true)}
                           disabled={busyId === c.categoryId}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12.5px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                         >

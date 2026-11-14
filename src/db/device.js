@@ -1,5 +1,7 @@
 import { db } from "./db";
 
+window.db = db;
+
 const generateDeviceId = () => {
   return `DEVICE-${crypto.randomUUID()}`;
 };

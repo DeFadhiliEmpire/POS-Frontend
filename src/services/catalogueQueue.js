@@ -1,5 +1,7 @@
 import { db } from "../db/db.js";
 
+window.db = db;
+
 const createCategoryId = () => crypto.randomUUID();
 const createObjectId = () => crypto.randomUUID();
 
@@ -40,30 +42,36 @@ const queueCatalogueOperation = async ({
   }
 
   if (existing) {
-    const isPendingCreate = existing.action === "create";
+    const isPending = existing.status === "pending";
+    const isPendingCreate = isPending && existing.action === "create";
+
+    const operationId = isPending ? existing.operationId : createOperationId();
 
     await db.catalogueSync.update(existing.id, {
-      operationId:
-        existing.status === "pending"
-          ? existing.operationId
-          : createOperationId(),
+      operationId,
 
       action: isPendingCreate ? "create" : action,
 
-      baseVersion:
-        existing.status === "pending" ? existing.baseVersion : baseVersion,
+      baseVersion: isPending ? existing.baseVersion : baseVersion,
 
-      payload: isPendingCreate ? { ...existing.payload, ...payload } : payload,
+      payload: isPendingCreate
+        ? { ...existing.payload, ...payload }
+        : isPending
+          ? { ...existing.payload, ...payload }
+          : payload,
 
       status: "pending",
-      error: null,
+      attempts: 0,
+      nextRetryAt: null,
+      lastError: null,
       updatedAt: new Date().toISOString(),
     });
 
-    return existing.operationId;
+    return operationId;
   }
 
   const operationId = createOperationId();
+  const now = new Date().toISOString();
 
   await db.catalogueSync.add({
     operationId,
@@ -74,8 +82,10 @@ const queueCatalogueOperation = async ({
     payload,
     status: "pending",
     attempts: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    nextRetryAt: null,
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
   });
 
   return operationId;

@@ -5,6 +5,8 @@ import {
   updateCategoryStatusRemote,
 } from "./categoryApi";
 
+window.db = db;
+
 let isCategorySyncRunning = false;
 
 export async function syncPendingCategories(token) {

@@ -1,5 +1,7 @@
 import { db } from "../db/db.js";
 
+window.db = db;
+
 export const saveOfflineSale = async (sale) => {
   try {
     if (!sale.clientSaleId) {
