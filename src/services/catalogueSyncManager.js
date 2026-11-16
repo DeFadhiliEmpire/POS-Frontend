@@ -217,6 +217,10 @@ const prepareProductCategoryReference = async (operation) => {
     return null;
   }
 
+  if (!category.isActive) {
+    throw new Error("Cannot create a product in an inactive category");
+  }
+
   /*
    * IMPORTANT:
    *
@@ -229,7 +233,13 @@ const prepareProductCategoryReference = async (operation) => {
    * The backend expects payload.category.
    */
 
-  payload.category = String(category.serverId);
+  const categoryUid = category.categoryUid || category.categoryId;
+
+  if (!categoryUid) {
+    throw new Error("Category UUID is missing");
+  }
+
+  payload.category = String(category.categoryUid);
 
   // Preserve the UUID fields if they are part of the local payload.
   if (payload.categoryId) {
