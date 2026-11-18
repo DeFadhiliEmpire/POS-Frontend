@@ -378,13 +378,34 @@ const applyDownloadedChanges = async (changes = {}) => {
       // ----------------------------------------------
 
       for (const product of changes.products || []) {
-        if (!product._id && !product.serverId) {
+        const serverId = String(product._id || product.serverId || "");
+
+        if (!serverId) {
           console.error("Downloaded product has no server ID:", product);
 
           continue;
         }
 
-        const productId = String(product._id || product.serverId);
+        const productUid = product.productUid
+          ? String(product.productUid)
+          : null;
+
+        let existingProduct = null;
+
+        if (productUid) {
+          existingProduct = await db.products.get(productUid);
+        }
+
+        if (!existingProduct) {
+          existingProduct = await db.products
+            .filter((item) => String(item.serverId || "") === serverId)
+            .first();
+        }
+
+        // Preserve the original local primary key.
+        const productId = existingProduct
+          ? existingProduct.productId
+          : productUid || serverId;
 
         // Do not overwrite a product with pending local changes.
         const pending = await db.catalogueSync
@@ -398,6 +419,10 @@ const applyDownloadedChanges = async (changes = {}) => {
         if (pending) {
           continue;
         }
+
+        // --------------------------------------------
+        // RESOLVE CATEGORY UUID
+        // --------------------------------------------
 
         let categoryUid = null;
         let categoryServerId = null;
@@ -444,9 +469,16 @@ const applyDownloadedChanges = async (changes = {}) => {
           continue;
         }
 
+        // --------------------------------------------
+        // UPDATE EXISTING OR INSERT REMOTE PRODUCT
+        // --------------------------------------------
         await db.products.put({
+          ...existingProduct,
           productId,
-          serverId: productId,
+          serverId,
+
+          // Stable cross-device identity.
+          ...(productUid ? { productUid } : {}),
 
           name: product.name,
           sku: product.sku,

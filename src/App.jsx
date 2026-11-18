@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
 import { useEffect } from "react";
 import AppLayout from "./components/layout/AppLayout.jsx";
 import Login from "./pages/Login.jsx";
@@ -15,23 +21,54 @@ import AutoSaleSync from "./AutoSaleSync";
 import { useContext } from "react";
 import { AuthContext } from "./AuthContext";
 
+function RequireAuth() {
+  const { authStatus } = useContext(AuthContext);
+
+  if (authStatus === "loading") {
+    return <div>Restoring your session...</div>;
+  }
+
+  if (authStatus === "offline") {
+    return (
+      <div>
+        <h2>Unable to verify your session</h2>
+        <p>
+          You appear to be offline. Connect to the internet to restore your
+          authentication session.
+        </p>
+      </div>
+    );
+  }
+
+  if (authStatus !== "authenticated") {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <>
+      <AutoSaleSync />
+      <Outlet />
+    </>
+  );
+}
+
 function App() {
-  const { accessToken, getToken } = useContext(AuthContext);
+  const { accessToken, getToken, authStatus } = useContext(AuthContext);
 
   useEffect(() => {
     // Do not start catalogue synchronization when logged out.
-    if (!accessToken) return;
+    if (authStatus !== "authenticated" || !accessToken) return;
 
     const stopCatalogueSync = startAutomaticCatalogueSync(getToken);
 
     return () => {
       stopCatalogueSync();
     };
-  }, [accessToken, getToken]);
+  }, [authStatus, accessToken, getToken]);
 
   return (
     <BrowserRouter>
-      <AutoSaleSync />
+      {/*<AutoSaleSync />*/}
       <Routes>
         <Route path="/" element={<h1>Home Page</h1>} />
         <Route path="/login" element={<Login />} />
@@ -41,11 +78,13 @@ function App() {
         <Route path="/testofflinesale" element={<TestOfflineSale />} />
         <Route path="/testonlinesalesync" element={<TestOnlineSaleSync />} />
 
-        {/* App tabs – all share <Sidebar/> + <Topbar/> through AppLayout */}
-        <Route element={<AppLayout />}>
-          <Route path="/sales" element={<Sales />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/categories" element={<Categories />} />
+        <Route element={<RequireAuth />}>
+          {/* App tabs – all share <Sidebar/> + <Topbar/> through AppLayout */}
+          <Route element={<AppLayout />}>
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/categories" element={<Categories />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

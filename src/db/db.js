@@ -50,6 +50,42 @@ db.version(5).stores({
   categories: "categoryId,name,normalizedName,isActive,syncStatus,version",
 });
 
+const productIds = [
+  "1032e9c1-d345-44f1-ab64-5038219821c4",
+  "2a6980a1-7866-4638-903f-f13122013b39",
+];
+
+for (const productId of productIds) {
+  const product = await db.products.get(productId);
+
+  const operations = await db.catalogueSync
+    .where("[entityType+entityId]")
+    .equals(["product", productId])
+    .toArray();
+
+  console.log("PRODUCT:", productId);
+  console.log("LOCAL RECORD:", product);
+  console.log("CATALOGUE OPERATIONS:", operations);
+}
+
+const productId = "1032e9c1-d345-44f1-ab64-5038219821c4";
+
+const product = await db.products.get(productId);
+
+const operations = await db.catalogueSync
+  .where("[entityType+entityId]")
+  .equals(["product", productId])
+  .toArray();
+
+const pending = await db.pendingSync.toArray();
+
+console.log("FIRST FANTA RECORD:", product);
+console.log("FIRST FANTA OPERATIONS:", operations);
+console.log(
+  "RELATED PENDING QUEUE:",
+  pending.filter((item) => item.referenceId === productId),
+);
+
 const getNextCounter = async (key) => {
   let counter = await db.counters.where("key").equals(key).first();
   if (!counter) {
