@@ -13,6 +13,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales.jsx";
 import Products from "./pages/Products.jsx";
 import Categories from "./pages/Categories.jsx";
+import Inventory from "./pages/Inventory.jsx";
 import { startAutomaticCatalogueSync } from "./services/catalogueSyncManager.js";
 import TestProducts from "./TestProducts";
 import TestOfflineSale from "./TestOfflineSale";
@@ -84,6 +85,7 @@ function App() {
             <Route path="/sales" element={<Sales />} />
             <Route path="/products" element={<Products />} />
             <Route path="/categories" element={<Categories />} />
+            <Route path="/inventory" element={<Inventory />} />
           </Route>
         </Route>
       </Routes>
