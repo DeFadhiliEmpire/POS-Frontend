@@ -151,7 +151,7 @@ const updateProduct = async (productId, changes) => {
     }
   }
 
-  return db.transaction(
+  const updatedProduct = await db.transaction(
     "rw",
     db.products,
     db.categories,
@@ -241,35 +241,50 @@ const updateProduct = async (productId, changes) => {
       return updated;
     },
   );
+
+  //Dispatch only after the transaction has committed
+  requestCatalogueSync();
+
+  return updatedProduct;
 };
 
 const deactivateProduct = async (productId) => {
-  return db.transaction("rw", db.products, db.catalogueSync, async () => {
-    const product = await db.products.get(productId);
+  const deactivatedProduct = await db.transaction(
+    "rw",
+    db.products,
+    db.catalogueSync,
+    async () => {
+      const product = await db.products.get(productId);
 
-    if (!product || !product.isActive) {
-      throw new Error("Product not found or already inactive");
-    }
+      if (!product || !product.isActive) {
+        throw new Error("Product not found or already inactive");
+      }
 
-    if (product.syncStatus === "conflict") {
-      throw new Error("Resolve this product's sync conflict first");
-    }
+      if (product.syncStatus === "conflict") {
+        throw new Error("Resolve this product's sync conflict first");
+      }
 
-    await db.products.update(productId, {
-      isActive: false,
-      syncStatus: "pending",
-    });
+      await db.products.update(productId, {
+        isActive: false,
+        syncStatus: "pending",
+      });
 
-    await queueCatalogueOperation({
-      entityType: "product",
-      entityId: productId,
-      action: "deactivate",
-      baseVersion: product.version || 1,
-      payload: {},
-    });
+      await queueCatalogueOperation({
+        entityType: "product",
+        entityId: productId,
+        action: "deactivate",
+        baseVersion: product.version || 1,
+        payload: {},
+      });
 
-    return { success: true };
-  });
+      return { success: true };
+    },
+  );
+
+  //Dispatch only after the transaction has committed
+  requestCatalogueSync();
+
+  return deactivatedProduct;
 };
 
 const getProducts = async () => {

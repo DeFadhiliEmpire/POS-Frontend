@@ -121,7 +121,10 @@ export default function Topbar({ onMenu }) {
             <ChevronDown size={16} className="hidden sm:block cursor-pointer" />
           </button>
           {showProfile && (
-            <div className="absolute right-0 top-0 mt-12 mr-2 w-48 bg-black shadow-lg rounded-md p-3 text-sm overflow-hidden">
+            <div
+              className="absolute right-0 top-0 mt-12 mr-2 w-48 bg-black shadow-lg rounded-md p-3 text-sm overflow-hidden"
+              onMouseDown={(e) => e.target === e.currentTarget}
+            >
               <p className="font-semibold text-white">
                 {initials(user?.name || "")}
               </p>
