@@ -116,7 +116,8 @@ export default function Inventory() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
+  {
+    /*useEffect(() => {
     let cancelled = false;
     setLoading(true);
     listInventory({ page, limit: PAGE_SIZE, search: query, category, status })
@@ -136,7 +137,8 @@ export default function Inventory() {
     return () => {
       cancelled = true;
     };
-  }, [page, query, category, status, refresh]);
+  }, [page, query, category, status, refresh]);*/
+  }
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total ? (page - 1) * PAGE_SIZE + 1 : 0;
